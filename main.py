@@ -1,11 +1,13 @@
 from pathlib import Path
+
+from scipy import fft
 from scipy.constants import c, k, u
 from scipy.signal import find_peaks
 import pandas as pd, numpy as np, matplotlib.pyplot as plt
 
-check_magic = False
-show_data = False
-show_peaks_and_edges = False
+show_data = True
+check_magic = True
+show_peaks_and_edges = True
 show_freq_fit = True
 
 
@@ -14,9 +16,9 @@ def load(_filepath):
     return pd.read_csv(_filepath).to_numpy().T  # type: ignore
 
 
-_, c1, fabry, c3 = load("data//FP1.CSV")
-_, c3_pumped = load("data//FP02.CSV")
-_, c3_unpumped = load("data//FP03.CSV")
+_, fabry = load("data//Session 7//FP9.CSV")
+_, c3_pumped = load("data//Session 7//C3P9.CSV")
+_, c3_unpumped = load("data//Session 7//C3U9.CSV")
 diff_raw = c3_pumped - c3_unpumped
 if show_data:
     plt.subplot(2, 1, 1)
@@ -64,10 +66,10 @@ if show_peaks_and_edges:
     plt.plot(fabry)
     plt.plot(peaks, fabry[peaks], "rx")
     plt.subplot(2, 2, 2)
-    plt.plot(peaks, peak_index, label="Peaks")
+    plt.plot(peaks, peak_index,"x", label="Peaks")
     plt.plot(index, linear_freq(index), label="Linear fit")
     plt.subplot(2, 2, 3)
-    plt.plot(peaks, peak_index - linear_freq(peaks), label="Diff")
+    plt.plot(peaks, peak_index - linear_freq(peaks),"x", label="Diff")
     plt.subplot(2, 2, 4)
     plt.plot(c3_pumped)
     plt.axvline(left_edge, color='r', label="Edges")
@@ -81,16 +83,19 @@ index = index[left_edge:right_edge + 1]
 fabry = fabry[left_edge:right_edge + 1]
 c3_pumped = c3_pumped[left_edge:right_edge + 1]
 c3_unpumped = c3_unpumped[left_edge:right_edge + 1]
+diff = c3_pumped - c3_unpumped
 
 freq_fit = np.poly1d(np.polyfit(peaks, peak_index, 5))
 freq = freq_fit(index)
 if show_freq_fit:
-    plt.subplot(3, 1, 1)
+    plt.subplot(2, 2, 1)
     plt.plot(freq, c3_pumped)
-    plt.subplot(3, 1, 2)
+    plt.subplot(2,2, 2)
     plt.plot(index, freq)
     plt.plot(peaks, peak_index)
-    plt.subplot(3, 1, 3)
+    plt.subplot(2,2, 3)
     plt.plot(peaks, peak_index - freq_fit(peaks))
+    plt.subplot(2, 2, 4)
+    plt.plot(freq, diff)
     plt.show()
 # endregion
