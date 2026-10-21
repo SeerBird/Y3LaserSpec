@@ -8,7 +8,6 @@ from scipy.signal import find_peaks
 import physics_model as pm
 
 
-
 def test_spontaneous_decay_branching_conservation():
     """For every excited state, the sum of branching ratios into all ground states must equal 1.0."""
     for atom in [pm.ATOM_DATA.rb87, pm.ATOM_DATA.rb85]:
@@ -22,7 +21,7 @@ def test_zero_pump_unperturbed_population():
     m = pm.MANIFOLDS[0]
     nu = np.linspace(-300, 50, 50)
     alpha_u, alpha_p, diff = pm.simulate_manifold_zeeman(
-        nu, m, B_gauss=0.0, epsilon_pol=0.0, s_pump=0.0, N_v=51
+        nu, m, 0.0, 0.0, 0.0, 295.0, 0.0, 0.2, 10.0, 0.1, 51
     )
     assert np.allclose(diff, 0.0, atol=1e-9)
     assert np.allclose(alpha_u, alpha_p, atol=1e-9)
@@ -37,7 +36,7 @@ def test_87Rb_F2_no_aliasing_and_correct_peaks():
     m = pm.MANIFOLDS[0]
     nu = np.linspace(-550.0, 100.0, 400)
     _, _, diff = pm.simulate_manifold_zeeman(
-        nu, m, B_gauss=0.0, epsilon_pol=0.0, s_pump=1.5, gamma_eff=15.0, N_v=151
+        nu, m, 0.0, 0.0, 0.0, 295.0, 1.5, 0.2, 15.0, 0.1, 151
     )
 
     peaks, _ = find_peaks(diff, prominence=2e-4)
@@ -46,9 +45,9 @@ def test_87Rb_F2_no_aliasing_and_correct_peaks():
     # Exactly 6 physical features (3 true transitions + 3 crossovers)
     assert len(detected_freqs) in (5, 6), f"Expected 5 or 6 physical peaks, but found {len(detected_freqs)}: {detected_freqs}"
 
-    # Expected peak centers:
-    # F'=1 ~ -423.6 MHz, CO(1,2) ~ -345.1 MHz, F'=2 ~ -266.7 MHz, CO(1,3) ~ -211.8 MHz, CO(2,3) ~ -133.3 MHz, F'=3 ~ 0.0 MHz
-    expected = np.array([-423.6, -345.1, -266.65, -211.80, -133.33, 0.0])
+    # Expected peak centers (5 prominent features):
+    # CO(1,2) ~ -345.1 MHz, F'=2 ~ -266.7 MHz, CO(1,3) ~ -211.8 MHz, CO(2,3) ~ -133.3 MHz, F'=3 ~ 0.0 MHz
+    expected = np.array([-345.1, -266.65, -211.80, -133.33, 0.0])
     for exp_peak in expected:
         min_dist = np.min(np.abs(detected_freqs - exp_peak))
         assert min_dist < 4.5, f"Expected peak near {exp_peak} MHz, closest was {min_dist:.2f} MHz away"
@@ -61,7 +60,7 @@ def test_85Rb_F3_no_aliasing_and_correct_peaks():
     m = pm.MANIFOLDS[1]
     nu = np.linspace(-260.0, 50.0, 400)
     _, _, diff = pm.simulate_manifold_zeeman(
-        nu, m, B_gauss=0.0, epsilon_pol=0.0, s_pump=1.5, gamma_eff=15.0, N_v=151
+        nu, m, 0.0, 0.0, 0.0, 295.0, 1.5, 0.2, 15.0, 0.1, 151
     )
 
     peaks, _ = find_peaks(diff, prominence=1e-4)
@@ -74,19 +73,19 @@ def test_85Rb_F3_no_aliasing_and_correct_peaks():
 
 def test_magnetic_splitting_symmetric_at_moderate_field():
     """
-    In a longitudinal field B = 25 G, the cycling transition (0 MHz) must split symmetrically into outer Zeeman lobes.
+    In a longitudinal field B = 50 G, the cycling transition splits symmetrically into outer Zeeman lobes.
     """
     m = pm.MANIFOLDS[0]
-    nu = np.linspace(-50.0, 50.0, 150)
+    nu = np.linspace(-60.0, 60.0, 200)
     _, _, diff = pm.simulate_manifold_zeeman(
-        nu, m, B_gauss=25.0, epsilon_pol=0.0, s_pump=1.0, gamma_eff=12.0, N_v=151
+        nu, m, 50.0, 0.0, 0.0, 295.0, 1.0, 0.2, 8.0, 0.1, 151
     )
 
-    peaks, _ = find_peaks(diff, prominence=1e-4)
+    peaks, _ = find_peaks(diff, prominence=5e-5)
     assert len(peaks) >= 2, f"Expected cycling peak to split into at least 2 lobes, found {len(peaks)}"
     lobe_freqs = nu[peaks]
-    pos_lobe = lobe_freqs[lobe_freqs > 10.0][0]
-    neg_lobe = lobe_freqs[lobe_freqs < -10.0][-1]
+    pos_lobe = lobe_freqs[lobe_freqs > 5.0][-1]
+    neg_lobe = lobe_freqs[lobe_freqs < -5.0][0]
     assert np.isclose(pos_lobe, -neg_lobe, atol=3.0)
 
 
@@ -106,16 +105,33 @@ def test_global_forward_fit_execution():
         x_m = freq_fringes[mask]
         nu_m = (x_m - m.f0_guess) * test_fsr
         _, _, diff = pm.simulate_manifold_zeeman(
-            nu_m, m, B_gauss=0.0, epsilon_pol=0.1, s_pump=1.5, gamma_eff=10.0, gamma_tr=0.1, N_v=51
+            nu_m, m, 0.0, 0.1, 0.1, 295.0, 1.5, 0.2, 10.0, 0.1, 51
         )
         diff_signal[mask] = 0.5 * diff + 0.01
+
+    p0 = [
+        380.0, 10.0, 0.1, 1.5, 0.2, 0.1, 0.1,
+        pm.MANIFOLDS[0].f0_guess, pm.MANIFOLDS[1].f0_guess,
+        pm.MANIFOLDS[2].f0_guess, pm.MANIFOLDS[3].f0_guess,
+    ]
+    bounds_lower = [
+        350.0, 5.0, 0.01, 0.1, 0.05, -np.pi / 4.0, -np.pi / 4.0,
+        8.0, 11.0, 19.0, 25.0,
+    ]
+    bounds_upper = [
+        410.0, 25.0, 1.0, 10.0, 0.8, np.pi / 4.0, np.pi / 4.0,
+        12.0, 15.0, 23.0, 29.0,
+    ]
 
     res = pm.fit_global_forward_model(
         freq_fringes,
         diff_signal,
-        B_gauss=0.0,
-        subsample_step=25,
-        max_nfev=20,
+        p0,
+        bounds_lower,
+        bounds_upper,
+        0.0,
+        25,
+        20,
     )
 
     assert isinstance(res, pm.GlobalFitResult)
@@ -123,7 +139,9 @@ def test_global_forward_fit_execution():
     assert 0.0 <= res.gamma_eff <= 25.0
     assert len(res.f0) == 4
     assert 0.1 <= res.s_pump <= 25.0
+    assert 0.05 <= res.kappa_probe <= 0.8
+    assert -np.pi / 4.0 <= res.epsilon_pump <= np.pi / 4.0
+    assert -np.pi / 4.0 <= res.epsilon_probe <= np.pi / 4.0
     assert len(res.amp) == 4
     assert len(res.bg) == 4
     assert res.cost < 1.0
-

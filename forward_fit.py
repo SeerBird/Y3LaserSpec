@@ -41,106 +41,68 @@ def load_dataset():
     return freq_fringes, diff_cut, c3_pumped[left_edge : right_edge + 1], c3_unpumped[left_edge : right_edge + 1]
 
 
-def run_fits(B_gauss=0.0, epsilon_pol=0.0):
-    """
-    Fits the Zeeman-resolved rate equation model across all 4 manifolds with B=0 (or custom B).
-    """
-    freq_fringes, diff_cut, c3_pumped, c3_unpumped = load_dataset()
-
-    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
-
-    print("=" * 75)
-    print(f"ZEEMAN-RESOLVED FORWARD MODEL FIT (B = {B_gauss:.1f} G, epsilon = {np.degrees(epsilon_pol):.1f}°)")
-    print("=" * 75)
-
-    for i, m in enumerate(pm.MANIFOLDS):
-        r_min, r_max = m.fringe_window
-        mask = (freq_fringes >= r_min) & (freq_fringes <= r_max)
-        x_m = freq_fringes[mask]
-        y_m = diff_cut[mask]
-
-        # Fit Zeeman-resolved model with finite probe ratio (10% / 45% = 2/9)
-        kappa_probe = 10.0 / 45.0
-        res = pm.fit_manifold_zeeman(
-            x_m, y_m, manifold_index=i, B_gauss=B_gauss, epsilon_pol=epsilon_pol, kappa_probe=kappa_probe
-        )
-        fsr, f0, s_pump, gamma_eff, gamma_tr, amp, bg = res.x
-
-        # Dense curve for visualization
-        x_eval = np.linspace(r_min, r_max, 350)
-        nu_eval = (x_eval - f0) * fsr
-        _, _, diff_sim = pm.simulate_manifold_zeeman(
-            nu_eval,
-            m,
-            B_gauss=B_gauss,
-            epsilon_pol=epsilon_pol,
-            T=295.0,
-            s_pump=s_pump,
-            kappa_probe=kappa_probe,
-            gamma_eff=gamma_eff,
-            gamma_tr=gamma_tr,
-            N_v=151,
-        )
-        y_fit = amp * diff_sim + bg
-
-        print(f"Manifold: {m.name}")
-        print(f"  Etalon FSR          : {fsr:.2f} MHz (nominal ~374.74 MHz)")
-        print(f"  Line Center (f0)    : {f0:.4f} fringes")
-        print(f"  Saturation (s_pump) : {s_pump:.2f} (I_pump / I_sat)")
-        print(f"  Effective Linewidth : {gamma_eff:.2f} MHz")
-        print(f"  Transit Decay Rate  : {gamma_tr:.3f} MHz")
-        print(f"  Residual Norm (cost): {res.cost:.4e}")
-        print("-" * 75)
-
-        # Plot comparison
-        ax = axs.flat[i]
-        ax.plot(x_m, y_m, label="Measured Diff", color="navy", alpha=0.85)
-        ax.plot(x_eval, y_fit, "--", label="Zeeman Model Fit", color="crimson", linewidth=2.0)
-        ax.set_title(
-            f"{m.name} (FSR = {fsr:.1f} MHz, $s_{{pump}} = {s_pump:.2f}$, $\\Gamma_{{eff}} = {gamma_eff:.1f}$ MHz)",
-            fontsize=11,
-            fontweight="bold",
-        )
-        ax.set_xlabel("Fabry-Pérot Fringe Index")
-        ax.set_ylabel("Photodiode Voltage (V)")
-        ax.grid(True, linestyle=":", alpha=0.6)
-        ax.legend(loc="upper right")
-
-    plt.suptitle(
-        f"Doppler-Free Saturated Absorption: Zeeman-Resolved Rate Model (B = {B_gauss:.1f} G, Linear Pol)",
-        fontsize=14,
-        fontweight="bold",
-    )
-    plt.tight_layout()
-    plt.savefig("forward_model_fit.png", dpi=200)
-    print("\nSaved high-resolution comparison plot to 'forward_model_fit.png'.", flush=True)
-    plt.close(fig)
-
-
-def run_global_fit(B_gauss=0.0):
+def run_global_fit(B_gauss):
     """
     Fits a unified forward physical model across all four rubidium D2 manifolds simultaneously,
-    sharing the Fabry-Pérot FSR, polarization ellipticity epsilon_pol, homogeneous linewidth
-    gamma_eff, and transit relaxation rate gamma_tr.
+    sharing the Fabry-Pérot FSR, independent polarization ellipticities (pump & probe),
+    homogeneous linewidth gamma_eff, and transit relaxation rate gamma_tr.
     """
-    freq_fringes, diff_cut, c3_pumped, c3_unpumped = load_dataset()
+    freq_fringes, diff_cut, _, _ = load_dataset()
 
     print("=" * 80)
     print("GLOBAL MULTI-MANIFOLD FORWARD MODEL FIT (All 4 Manifolds Simultaneously)")
     print(f"Applied Longitudinal Magnetic Field: B = {B_gauss:.1f} G")
     print("=" * 80)
 
+    # Initial parameter guesses (explicitly defined at top level from polarimeter and physics)
+    # [fsr, gamma_eff, gamma_tr, s_pump, kappa_probe, epsilon_pump, epsilon_probe, f0_0, f0_1, f0_2, f0_3]
+    eps_pump_init = -np.radians(40)    # Polarimeter measurement for pump (~6.6°)
+    eps_probe_init = -np.radians(40.9)  # Polarimeter measurement for probe (~14.9°)
+    kappa_probe_init = 0.33            # Polarimeter measured probe/pump power ratio (110 uW / 330 uW)
+
+    p0 = [
+        375.0,                         # FSR (MHz)
+        12.0,                          # gamma_eff (MHz)
+        0.15,                          # gamma_tr (MHz)
+        2.0,                           # s_pump
+        kappa_probe_init,              # kappa_probe
+        eps_pump_init,                 # epsilon_pump (rad)
+        eps_probe_init,                # epsilon_probe (rad)
+        pm.MANIFOLDS[0].f0_guess,      # f0: 87Rb F=2
+        pm.MANIFOLDS[1].f0_guess,      # f0: 85Rb F=3
+        pm.MANIFOLDS[2].f0_guess,      # f0: 85Rb F=2
+        pm.MANIFOLDS[3].f0_guess,      # f0: 87Rb F=1
+    ]
+
+    bounds_lower = [
+        360.0, 5.0, 0.01, 0.1, 0.05, -np.pi / 4.0, -np.pi / 4.0,
+        9.5, 12.5, 20.0, 26.5,
+    ]
+    bounds_upper = [
+        400.0, 30.0, 2.0, 20.0, 0.8, np.pi / 4.0, np.pi / 4.0,
+        11.0, 14.0, 21.5, 28.0,
+    ]
+
+    subsample_step = 50
+    max_nfev = 60
+
     fit_res = pm.fit_global_forward_model(
         freq_fringes,
         diff_cut,
-        B_gauss=B_gauss,
-        kappa_probe=10.0 / 45.0,
+        p0,
+        bounds_lower,
+        bounds_upper,
+        B_gauss,
+        subsample_step,
+        max_nfev,
     )
 
     print("\n" + "=" * 80)
     print("GLOBAL CONVERGED PARAMETERS (SHARED ACROSS ALL 4 MANIFOLDS):")
     print(f"  Fabry-Perot FSR          : {fit_res.fsr:.3f} MHz (nominal ~374.74 MHz)")
-    print(f"  Polarization Ellipticity : {fit_res.epsilon_pol:.4f} rad ({np.degrees(fit_res.epsilon_pol):.2f}°)")
+    print(f"  Pump Ellipticity         : {fit_res.epsilon_pump:.4f} rad ({np.degrees(fit_res.epsilon_pump):.2f}°)")
+    print(f"  Probe Ellipticity        : {fit_res.epsilon_probe:.4f} rad ({np.degrees(fit_res.epsilon_probe):.2f}°)")
+    print(f"  Probe / Pump Ratio kappa : {fit_res.kappa_probe:.3f} (measured power ratio ~0.33)")
     print(f"  Homogeneous Linewidth    : {fit_res.gamma_eff:.2f} MHz (natural Gamma_0 = 6.07 MHz)")
     print(f"  Beam Transit Rate        : {fit_res.gamma_tr:.4f} MHz")
     print(f"  Global Pump Saturation   : {fit_res.s_pump:.2f} (I_pump / I_sat,0)")
@@ -168,14 +130,15 @@ def run_global_fit(B_gauss=0.0):
         _, _, diff_sim = pm.simulate_manifold_zeeman(
             nu_eval,
             m,
-            B_gauss=B_gauss,
-            epsilon_pol=fit_res.epsilon_pol,
-            T=295.0,
-            s_pump=fit_res.s_pump,
-            kappa_probe=10.0 / 45.0,
-            gamma_eff=fit_res.gamma_eff,
-            gamma_tr=fit_res.gamma_tr,
-            N_v=151,
+            B_gauss,
+            fit_res.epsilon_pump,
+            fit_res.epsilon_probe,
+            295.0,
+            fit_res.s_pump,
+            fit_res.kappa_probe,
+            fit_res.gamma_eff,
+            fit_res.gamma_tr,
+            151,
         )
         y_fit = fit_res.amp[i] * diff_sim + fit_res.bg[i]
 
@@ -193,8 +156,8 @@ def run_global_fit(B_gauss=0.0):
         ax.legend(loc="upper right")
 
     plt.suptitle(
-        f"Global Forward Model Fit (Shared FSR = {fit_res.fsr:.1f} MHz, $s_{{pump}} = {fit_res.s_pump:.2f}$, $\\epsilon_{{pol}} = {np.degrees(fit_res.epsilon_pol):.1f}^\\circ$, $\\Gamma_{{eff}} = {fit_res.gamma_eff:.1f}$ MHz, $\\gamma_{{tr}} = {fit_res.gamma_tr:.3f}$ MHz)",
-        fontsize=12,
+        f"Global Fit: FSR = {fit_res.fsr:.1f} MHz, $s_{{pump}} = {fit_res.s_pump:.2f}$, $\\kappa = {fit_res.kappa_probe:.2f}$, $\\epsilon_{{pump}} = {np.degrees(fit_res.epsilon_pump):.1f}^\\circ$, $\\epsilon_{{probe}} = {np.degrees(fit_res.epsilon_probe):.1f}^\\circ$, $\\Gamma_{{eff}} = {fit_res.gamma_eff:.1f}$ MHz",
+        fontsize=14,
         fontweight="bold",
     )
     plt.tight_layout()
@@ -205,38 +168,6 @@ def run_global_fit(B_gauss=0.0):
     return fit_res
 
 
-def simulate_magnetic_field_effect():
-    """
-    Demonstrates the predicted effect of turning on the Helmholtz coils (B > 0).
-    Saves a comparison plot for 87Rb F=2 showing Zeeman splitting.
-    """
-    m = pm.MANIFOLDS[0]  # 87Rb F=2
-    nu = np.linspace(-550.0, 150.0, 400)
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    fields = [0.0, 10.0, 30.0]
-    colors = ['navy', 'forestgreen', 'crimson']
-
-    for B, col in zip(fields, colors):
-        _, _, diff = pm.simulate_manifold_zeeman(
-            nu, m, B_gauss=B, epsilon_pol=0.0, T=295.0, s_pump=1.5, gamma_eff=15.0, gamma_tr=0.1, N_v=51
-        )
-        ax.plot(nu, diff, label=f"B = {B:.0f} Gauss", color=col, linewidth=1.8)
-
-    ax.set_title("Predicted Zeeman Splitting in 87Rb F=2 with Longitudinal B-Field (k || B)")
-    ax.set_xlabel("Relative Frequency (MHz)")
-    ax.set_ylabel("Saturated Absorption Signal (arb)")
-    ax.grid(True, linestyle=":", alpha=0.6)
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig("zeeman_splitting_prediction.png", dpi=200)
-    print("Saved magnetic field prediction plot to 'zeeman_splitting_prediction.png'.", flush=True)
-    plt.close(fig)
-
-
 if __name__ == "__main__":
-    # 1. Fit global unified forward model across all 4 manifolds simultaneously
-    run_global_fit(B_gauss=0.0)
-
-    # 2. Simulate what happens when coils are turned on (B = 0, 10, 30 G)
-    simulate_magnetic_field_effect()
+    # Fit global unified forward model across all 4 manifolds simultaneously
+    run_global_fit(0.0)
