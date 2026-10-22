@@ -60,12 +60,14 @@ def plot_polarization_effects(resolution:int):
         # Baseline & amplitude normalization from linear fit for lab polarimeter case
         eps_pump_ref = np.radians(6.6)
         eps_probe_ref = np.radians(14.9)
+        delta_theta_ref = np.radians(100.0)
         _, _, diff_ref = pm.simulate_manifold_zeeman(
             nu_eval,
             m,
             B_gauss,
             eps_pump_ref,
             eps_probe_ref,
+            delta_theta_ref,
             T,
             s_pump,
             kappa_probe,
@@ -91,12 +93,14 @@ def plot_polarization_effects(resolution:int):
         for label, ep_deg, epr_deg, col, ls in polarization_scenarios:
             ep_rad = np.radians(ep_deg)
             epr_rad = np.radians(epr_deg)
+            dth = 0.0 if "Linear || Linear" in label else delta_theta_ref
             _, _, diff_sim = pm.simulate_manifold_zeeman(
                 nu_eval,
                 m,
                 B_gauss,
                 ep_rad,
                 epr_rad,
+                dth,
                 T,
                 s_pump,
                 kappa_probe,
@@ -160,6 +164,7 @@ def plot_qwp_rotation_sweep():
             B_gauss,
             eps_pump_fixed,
             eps_pr_rad,
+            np.radians(100.0),
             T,
             s_pump,
             kappa_probe,
@@ -189,6 +194,7 @@ def plot_qwp_rotation_sweep():
             B_gauss,
             eps_p_rad,
             eps_probe_fixed,
+            np.radians(100.0),
             T,
             s_pump,
             kappa_probe,

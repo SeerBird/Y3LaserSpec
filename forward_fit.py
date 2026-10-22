@@ -55,10 +55,11 @@ def run_global_fit(B_gauss):
     print("=" * 80)
 
     # Initial parameter guesses (explicitly defined at top level from polarimeter and physics)
-    # [fsr, gamma_eff, gamma_tr, s_pump, kappa_probe, epsilon_pump, epsilon_probe, f0_0, f0_1, f0_2, f0_3]
-    eps_pump_init = -np.radians(40)    # Polarimeter measurement for pump (~6.6°)
-    eps_probe_init = -np.radians(40.9)  # Polarimeter measurement for probe (~14.9°)
-    kappa_probe_init = 0.33            # Polarimeter measured probe/pump power ratio (110 uW / 330 uW)
+    # [fsr, gamma_eff, gamma_tr, s_pump, kappa_probe, epsilon_pump, epsilon_probe, delta_theta, f0_0, f0_1, f0_2, f0_3]
+    eps_pump_init = np.radians(-30.6)      # Polarimeter measurement for pump (~6.6°)
+    eps_probe_init = np.radians(-14.9)    # Polarimeter measurement for probe (~14.9°)
+    kappa_probe_init = 0.33              # Polarimeter measured probe/pump power ratio (110 uW / 330 uW)
+    delta_theta_init = np.radians(50.0) # Polarimeter measured major-axis angle difference (~100°)
 
     p0 = [
         375.0,                         # FSR (MHz)
@@ -68,6 +69,7 @@ def run_global_fit(B_gauss):
         kappa_probe_init,              # kappa_probe
         eps_pump_init,                 # epsilon_pump (rad)
         eps_probe_init,                # epsilon_probe (rad)
+        delta_theta_init,              # delta_theta (rad)
         pm.MANIFOLDS[0].f0_guess,      # f0: 87Rb F=2
         pm.MANIFOLDS[1].f0_guess,      # f0: 85Rb F=3
         pm.MANIFOLDS[2].f0_guess,      # f0: 85Rb F=2
@@ -75,11 +77,11 @@ def run_global_fit(B_gauss):
     ]
 
     bounds_lower = [
-        360.0, 5.0, 0.01, 0.1, 0.05, -np.pi / 4.0, -np.pi / 4.0,
+        360.0, 5.0, 0.01, 0.1, 0.05, -np.pi / 4.0, -np.pi / 4.0, 0.0,
         9.5, 12.5, 20.0, 26.5,
     ]
     bounds_upper = [
-        400.0, 30.0, 2.0, 20.0, 0.8, np.pi / 4.0, np.pi / 4.0,
+        400.0, 30.0, 2.0, 20.0, 0.8, np.pi / 4.0, np.pi / 4.0, np.pi,
         11.0, 14.0, 21.5, 28.0,
     ]
 
@@ -103,6 +105,7 @@ def run_global_fit(B_gauss):
     print(f"  Pump Ellipticity         : {fit_res.epsilon_pump:.4f} rad ({np.degrees(fit_res.epsilon_pump):.2f}°)")
     print(f"  Probe Ellipticity        : {fit_res.epsilon_probe:.4f} rad ({np.degrees(fit_res.epsilon_probe):.2f}°)")
     print(f"  Probe / Pump Ratio kappa : {fit_res.kappa_probe:.3f} (measured power ratio ~0.33)")
+    print(f"  Relative Orientation     : {fit_res.delta_theta:.4f} rad ({np.degrees(fit_res.delta_theta):.2f}°)")
     print(f"  Homogeneous Linewidth    : {fit_res.gamma_eff:.2f} MHz (natural Gamma_0 = 6.07 MHz)")
     print(f"  Beam Transit Rate        : {fit_res.gamma_tr:.4f} MHz")
     print(f"  Global Pump Saturation   : {fit_res.s_pump:.2f} (I_pump / I_sat,0)")
@@ -133,6 +136,7 @@ def run_global_fit(B_gauss):
             B_gauss,
             fit_res.epsilon_pump,
             fit_res.epsilon_probe,
+            fit_res.delta_theta,
             295.0,
             fit_res.s_pump,
             fit_res.kappa_probe,
@@ -156,8 +160,8 @@ def run_global_fit(B_gauss):
         ax.legend(loc="upper right")
 
     plt.suptitle(
-        f"Global Fit: FSR = {fit_res.fsr:.1f} MHz, $s_{{pump}} = {fit_res.s_pump:.2f}$, $\\kappa = {fit_res.kappa_probe:.2f}$, $\\epsilon_{{pump}} = {np.degrees(fit_res.epsilon_pump):.1f}^\\circ$, $\\epsilon_{{probe}} = {np.degrees(fit_res.epsilon_probe):.1f}^\\circ$, $\\Gamma_{{eff}} = {fit_res.gamma_eff:.1f}$ MHz",
-        fontsize=14,
+        f"Global Fit: FSR = {fit_res.fsr:.1f} MHz, $s_{{pump}} = {fit_res.s_pump:.2f}$, $\\kappa = {fit_res.kappa_probe:.2f}$, $\\epsilon_{{pump}} = {np.degrees(fit_res.epsilon_pump):.1f}^\\circ$, $\\epsilon_{{probe}} = {np.degrees(fit_res.epsilon_probe):.1f}^\\circ$, $\\Delta\\theta = {np.degrees(fit_res.delta_theta):.1f}^\\circ$, $\\Gamma_{{eff}} = {fit_res.gamma_eff:.1f}$ MHz",
+        fontsize=13,
         fontweight="bold",
     )
     plt.tight_layout()

@@ -219,6 +219,7 @@ def simulate_manifold_zeeman(
     B_gauss,
     epsilon_pump,
     epsilon_probe,
+    delta_theta,
     T,
     s_pump,
     kappa_probe,
@@ -319,7 +320,16 @@ def simulate_manifold_zeeman(
     # 6. 1D velocity integral over Maxwell-Boltzmann distribution
     alpha_pumped = np.trapezoid(alpha_v_pumped * f_v[None, :], v_z, axis=-1)
     alpha_unpumped = np.trapezoid(alpha_v_unpumped * f_v[None, :], v_z, axis=-1)
-    diff = alpha_unpumped - alpha_pumped
+    
+    # 7. Polarization mode overlap and Larmor precession dephasing
+    P_geom = (np.cos(delta_theta)**2 * np.cos(epsilon_pump - epsilon_probe)**2 + 
+              np.sin(delta_theta)**2 * np.sin(epsilon_pump + epsilon_probe)**2)
+    P_circ = 0.5 * (1.0 + np.sin(2.0 * epsilon_pump) * np.sin(2.0 * epsilon_probe))
+    omega_L = 4.4 * abs(B_gauss)
+    dephasing = 1.0 / (1.0 + (2.0 * omega_L / gamma_tr)**2) if gamma_tr > 0 else 1.0
+    P_eff = float(np.clip(P_circ + (P_geom - P_circ) * dephasing, 1e-4, 1.0))
+
+    diff = P_eff * (alpha_unpumped - alpha_pumped)
 
     return alpha_unpumped, alpha_pumped, diff
 
@@ -334,6 +344,7 @@ class GlobalFitResult:
     kappa_probe: float
     epsilon_pump: float
     epsilon_probe: float
+    delta_theta: float
     f0: list[float]
     amp: list[float]
     bg: list[float]
@@ -372,8 +383,8 @@ def fit_global_forward_model(
         })
 
     def residuals(p):
-        fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe = p[0:7]
-        f0s = p[7:11]
+        fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe, delta_th = p[0:8]
+        f0s = p[8:12]
 
         all_res = []
         for i, s in enumerate(slices):
@@ -384,6 +395,7 @@ def fit_global_forward_model(
                 B_gauss,
                 eps_pump,
                 eps_probe,
+                delta_th,
                 295.0,
                 s_pump,
                 kappa_pr,
@@ -407,8 +419,8 @@ def fit_global_forward_model(
         verbose=0,
     )
 
-    fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe = res.x[0:7]
-    f0s = res.x[7:11]
+    fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe, delta_th = res.x[0:8]
+    f0s = res.x[8:12]
 
     amps, bgs = [], []
     for i, s in enumerate(slices):
@@ -419,6 +431,7 @@ def fit_global_forward_model(
             B_gauss,
             eps_pump,
             eps_probe,
+            delta_th,
             295.0,
             s_pump,
             kappa_pr,
@@ -439,6 +452,7 @@ def fit_global_forward_model(
         kappa_probe=float(kappa_pr),
         epsilon_pump=float(eps_pump),
         epsilon_probe=float(eps_probe),
+        delta_theta=float(delta_th),
         f0=[float(x) for x in f0s],
         amp=amps,
         bg=bgs,

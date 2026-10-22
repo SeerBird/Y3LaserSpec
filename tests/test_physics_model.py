@@ -21,7 +21,7 @@ def test_zero_pump_unperturbed_population():
     m = pm.MANIFOLDS[0]
     nu = np.linspace(-300, 50, 50)
     alpha_u, alpha_p, diff = pm.simulate_manifold_zeeman(
-        nu, m, 0.0, 0.0, 0.0, 295.0, 0.0, 0.2, 10.0, 0.1, 51
+        nu, m, 0.0, 0.0, 0.0, 0.0, 295.0, 0.0, 0.2, 10.0, 0.1, 51
     )
     assert np.allclose(diff, 0.0, atol=1e-9)
     assert np.allclose(alpha_u, alpha_p, atol=1e-9)
@@ -36,7 +36,7 @@ def test_87Rb_F2_no_aliasing_and_correct_peaks():
     m = pm.MANIFOLDS[0]
     nu = np.linspace(-550.0, 100.0, 400)
     _, _, diff = pm.simulate_manifold_zeeman(
-        nu, m, 0.0, 0.0, 0.0, 295.0, 1.5, 0.2, 15.0, 0.1, 151
+        nu, m, 0.0, 0.0, 0.0, 0.0, 295.0, 1.5, 0.2, 15.0, 0.1, 151
     )
 
     peaks, _ = find_peaks(diff, prominence=2e-4)
@@ -60,7 +60,7 @@ def test_85Rb_F3_no_aliasing_and_correct_peaks():
     m = pm.MANIFOLDS[1]
     nu = np.linspace(-260.0, 50.0, 400)
     _, _, diff = pm.simulate_manifold_zeeman(
-        nu, m, 0.0, 0.0, 0.0, 295.0, 1.5, 0.2, 15.0, 0.1, 151
+        nu, m, 0.0, 0.0, 0.0, 0.0, 295.0, 1.5, 0.2, 15.0, 0.1, 151
     )
 
     peaks, _ = find_peaks(diff, prominence=1e-4)
@@ -78,7 +78,7 @@ def test_magnetic_splitting_symmetric_at_moderate_field():
     m = pm.MANIFOLDS[0]
     nu = np.linspace(-60.0, 60.0, 200)
     _, _, diff = pm.simulate_manifold_zeeman(
-        nu, m, 50.0, 0.0, 0.0, 295.0, 1.0, 0.2, 8.0, 0.1, 151
+        nu, m, 50.0, 0.0, 0.0, 0.0, 295.0, 1.0, 0.2, 8.0, 0.1, 151
     )
 
     peaks, _ = find_peaks(diff, prominence=5e-5)
@@ -105,21 +105,21 @@ def test_global_forward_fit_execution():
         x_m = freq_fringes[mask]
         nu_m = (x_m - m.f0_guess) * test_fsr
         _, _, diff = pm.simulate_manifold_zeeman(
-            nu_m, m, 0.0, 0.1, 0.1, 295.0, 1.5, 0.2, 10.0, 0.1, 51
+            nu_m, m, 0.0, 0.1, 0.1, 0.0, 295.0, 1.5, 0.2, 10.0, 0.1, 51
         )
         diff_signal[mask] = 0.5 * diff + 0.01
 
     p0 = [
-        380.0, 10.0, 0.1, 1.5, 0.2, 0.1, 0.1,
+        380.0, 10.0, 0.1, 1.5, 0.2, 0.1, 0.1, 0.0,
         pm.MANIFOLDS[0].f0_guess, pm.MANIFOLDS[1].f0_guess,
         pm.MANIFOLDS[2].f0_guess, pm.MANIFOLDS[3].f0_guess,
     ]
     bounds_lower = [
-        350.0, 5.0, 0.01, 0.1, 0.05, -np.pi / 4.0, -np.pi / 4.0,
+        350.0, 5.0, 0.01, 0.1, 0.05, -np.pi / 4.0, -np.pi / 4.0, 0.0,
         8.0, 11.0, 19.0, 25.0,
     ]
     bounds_upper = [
-        410.0, 25.0, 1.0, 10.0, 0.8, np.pi / 4.0, np.pi / 4.0,
+        410.0, 25.0, 1.0, 10.0, 0.8, np.pi / 4.0, np.pi / 4.0, np.pi,
         12.0, 15.0, 23.0, 29.0,
     ]
 
@@ -137,6 +137,7 @@ def test_global_forward_fit_execution():
     assert isinstance(res, pm.GlobalFitResult)
     assert 350.0 <= res.fsr <= 410.0
     assert 0.0 <= res.gamma_eff <= 25.0
+    assert 0.0 <= res.delta_theta <= np.pi
     assert len(res.f0) == 4
     assert 0.1 <= res.s_pump <= 25.0
     assert 0.05 <= res.kappa_probe <= 0.8
