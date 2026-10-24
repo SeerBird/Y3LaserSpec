@@ -16,9 +16,9 @@ def load(_filepath):
     return pd.read_csv(_filepath).to_numpy().T  # type: ignore
 
 
-_, fabry = load("data//Session 7//FP9.CSV")
-_, c3_pumped = load("data//Session 7//C3P9.CSV")
-_, c3_unpumped = load("data//Session 7//C3U9.CSV")
+_, fabry = load("data/Session 8/FPMAG1.CSV")
+_, c3_pumped = load("data/Session 8/PMAG1.CSV")
+_, c3_unpumped = load("data/Session 8/UMAG1.CSV")
 diff_raw = c3_pumped - c3_unpumped
 if show_data:
     plt.subplot(2, 1, 1)

@@ -68,8 +68,9 @@ def analyze_datasets(filepath, invert_indices,names):
     plt.show()
 
 
-analyze_datasets("data/Clean polarizations.xlsx",
-                 (1, 3),
-                 ("probe", "pump", "probe_tied", "pump_again"))
-analyze_datasets("data/Incoming polarization.xlsx",[3],
-                 ["front","between","probe","pump"])
+if __name__ == "__main__":
+    analyze_datasets("data/Clean polarizations.xlsx",
+                     (1, 3),
+                     ("probe", "pump", "probe_tied", "pump_again"))
+    analyze_datasets("data/Incoming polarization.xlsx",[3],
+                     ["front","between","probe","pump"])

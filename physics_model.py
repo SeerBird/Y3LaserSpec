@@ -28,8 +28,13 @@ class AtomicStructure:
     E_e: np.ndarray
     mu_z_g: np.ndarray
     mu_z_e: np.ndarray
+    mu_x_mat_g: np.ndarray
+    mu_y_mat_g: np.ndarray
+    mu_z_mat_g: np.ndarray
     dq: np.ndarray
     b_decay: np.ndarray
+    partner_plus: np.ndarray
+    partner_minus: np.ndarray
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -84,6 +89,27 @@ def _build_single_atom_structure(name: str, iso: str) -> AtomicStructure:
     mu_z_g = -mu_g[1].diagonal() * 1e-6
     mu_z_e = -mu_e[1].diagonal() * 1e-6
 
+    # Full Cartesian magnetic dipole interaction matrices in MHz/Gauss
+    # H_Z = mu_x*Bx + mu_y*By + mu_z*Bz where mu = -mu_pylcp * 1e-6
+    mu_x_mat_g = -(mu_g[0] - mu_g[2]) / np.sqrt(2.0) * 1e-6
+    mu_y_mat_g = -1j * (mu_g[0] + mu_g[2]) / np.sqrt(2.0) * 1e-6
+    mu_z_mat_g = -mu_g[1] * 1e-6
+
+    # Lambda-system partners within each ground hyperfine level:
+    # partner_plus[g] is ground state with Delta m = +2 (for sigma+ / sigma- interference)
+    # partner_minus[g] is ground state with Delta m = -2
+    partner_plus = np.full(len(bg), -1, dtype=int)
+    partner_minus = np.full(len(bg), -1, dtype=int)
+    for g in range(len(bg)):
+        F_val = bg[g, 0]
+        m_val = bg[g, 1]
+        p_p = np.where((bg[:, 0] == F_val) & (bg[:, 1] == m_val + 2))[0]
+        if len(p_p) > 0:
+            partner_plus[g] = p_p[0]
+        p_m = np.where((bg[:, 0] == F_val) & (bg[:, 1] == m_val - 2))[0]
+        if len(p_m) > 0:
+            partner_minus[g] = p_m[0]
+
     return AtomicStructure(
         isotope=iso,
         atom=atom,
@@ -100,8 +126,13 @@ def _build_single_atom_structure(name: str, iso: str) -> AtomicStructure:
         E_e=E_e,
         mu_z_g=mu_z_g,
         mu_z_e=mu_z_e,
+        mu_x_mat_g=mu_x_mat_g,
+        mu_y_mat_g=mu_y_mat_g,
+        mu_z_mat_g=mu_z_mat_g,
         dq=dq,
         b_decay=b_decay,
+        partner_plus=partner_plus,
+        partner_minus=partner_minus,
     )
 
 
@@ -117,13 +148,11 @@ ATOM_DATA = _build_atom_structures()
 
 @dataclass
 class HyperfineManifold:
-    """Represents a specific hyperfine ground-state absorption manifold."""
+    """Represents an invariant hyperfine ground-state absorption manifold."""
     name: str
     isotope: str
     F_ground: int
     F_ref: int
-    fringe_window: tuple[float, float]
-    f0_guess: float
 
     @property
     def atom_data(self) -> AtomicStructure:
@@ -133,40 +162,12 @@ class HyperfineManifold:
         return getattr(self, item)
 
 
-# Hyperfine manifolds under study
+# Hyperfine manifolds under study (pure atomic quantum invariants)
 MANIFOLDS = [
-    HyperfineManifold(
-        name='87Rb F=2',
-        isotope='87',
-        F_ground=2,
-        F_ref=3,
-        fringe_window=(9.0, 10.6),
-        f0_guess=10.33,
-    ),
-    HyperfineManifold(
-        name='85Rb F=3',
-        isotope='85',
-        F_ground=3,
-        F_ref=4,
-        fringe_window=(12.6, 13.6),
-        f0_guess=13.34,
-    ),
-    HyperfineManifold(
-        name='85Rb F=2',
-        isotope='85',
-        F_ground=2,
-        F_ref=1,
-        fringe_window=(20.6, 21.4),
-        f0_guess=20.88,
-    ),
-    HyperfineManifold(
-        name='87Rb F=1',
-        isotope='87',
-        F_ground=1,
-        F_ref=0,
-        fringe_window=(27.1, 28.1),
-        f0_guess=27.28,
-    ),
+    HyperfineManifold(name='87Rb F=2', isotope='87', F_ground=2, F_ref=3),
+    HyperfineManifold(name='85Rb F=3', isotope='85', F_ground=3, F_ref=4),
+    HyperfineManifold(name='85Rb F=2', isotope='85', F_ground=2, F_ref=1),
+    HyperfineManifold(name='87Rb F=1', isotope='87', F_ground=1, F_ref=0),
 ]
 
 
@@ -213,13 +214,38 @@ def _solve_steady_state_populations(R, gamma_0, b_decay, gamma_tr, Ng, Ne):
     return sol[..., :Ng], sol[..., Ng:]
 
 
-def simulate_manifold_zeeman(
+def decompose_laser_polarization(
+    Bx: float, By: float, Bz: float, epsilon: float
+) -> tuple[float, float, float]:
+    """
+    Decomposes an elliptical laser polarization (propagating along z, major axis x)
+    into (I_plus, I_pi, I_minus) relative to an arbitrary 3D magnetic quantization axis B.
+    """
+    B_mag = np.sqrt(Bx**2 + By**2 + Bz**2)
+    if B_mag < 1e-9:
+        I_plus = 0.5 * (1.0 + np.sin(2.0 * epsilon))
+        I_minus = 0.5 * (1.0 - np.sin(2.0 * epsilon))
+        I_pi = 0.0
+        return float(I_plus), float(I_pi), float(I_minus)
+
+    cos_eps2 = np.cos(epsilon)**2
+    sin_eps2 = np.sin(epsilon)**2
+    I_pi = (Bx**2 * cos_eps2 + By**2 * sin_eps2) / (B_mag**2)
+    delta_I = np.sin(2.0 * epsilon) * (Bz / B_mag)
+
+    I_plus = 0.5 * (1.0 - I_pi + delta_I)
+    I_minus = 0.5 * (1.0 - I_pi - delta_I)
+    return max(0.0, float(I_plus)), max(0.0, float(I_pi)), max(0.0, float(I_minus))
+
+
+def simulate_manifold_coherent_operator(
     nu_local_mhz,
     manifold: HyperfineManifold,
-    B_gauss,
+    Bx_gauss,
+    By_gauss,
+    Bz_gauss,
     epsilon_pump,
     epsilon_probe,
-    delta_theta,
     T,
     s_pump,
     kappa_probe,
@@ -228,8 +254,129 @@ def simulate_manifold_zeeman(
     N_v,
 ):
     """
-    Computes steady-state saturated absorption with full Zeeman sublevel optical pumping
-    in a longitudinal magnetic field (k parallel to B).
+    Approach 3: Universal Coherent Transition Operator.
+    Evaluates coherent dipole vector sum across all transitions universally,
+    incorporating two-photon Raman dephasing in arbitrary 3D magnetic field B.
+    """
+    atom_info = manifold.atom_data
+    mass = atom_info.mass
+    k_wave = atom_info.k_wave
+    gamma_0 = atom_info.natural_gamma_mhz
+    F_g_target = manifold.F_ground
+    F_ref = manifold.F_ref
+
+    Ng = atom_info.Ng
+    Ne = atom_info.Ne
+    dq = atom_info.dq  # (3, Ng, Ne)
+    b_decay = atom_info.b_decay
+    ground_F = atom_info.ground_F
+    excited_F = atom_info.excited_F
+    E_e = atom_info.E_e
+    mu_z_g = atom_info.mu_z_g
+    mu_z_e = atom_info.mu_z_e
+
+    E_ref = E_e[excited_F == F_ref][0]
+    f_res_local = E_e - E_ref
+
+    B_mag = np.sqrt(Bx_gauss**2 + By_gauss**2 + Bz_gauss**2)
+
+    # Polarization decomposition in the magnetic quantization frame
+    I_plus_pump, I_pi_pump, I_minus_pump = decompose_laser_polarization(
+        Bx_gauss, By_gauss, Bz_gauss, epsilon_pump
+    )
+    I_plus_probe, I_pi_probe, I_minus_probe = decompose_laser_polarization(
+        Bx_gauss, By_gauss, Bz_gauss, epsilon_probe
+    )
+
+    # Ground-state Lande factor g_F for target manifold:
+    # 87Rb: F=1 => g_F = -1/2, F=2 => g_F = +1/2
+    # 85Rb: F=2 => g_F = -1/3, F=3 => g_F = +1/3
+    g_F_val = (0.5 if F_g_target == 2 else 0.5) if manifold.isotope == '87' else (1.0 / 3.0)
+    delta_R = 2.0 * g_F_val * 1.3996 * B_mag  # MHz
+    D_Raman = 1.0 / (1.0 + (delta_R / gamma_tr) ** 2) if gamma_tr > 0 else 1.0
+
+    target_mask = (ground_F == F_g_target)[:, None]
+
+    incoherent_pump = (
+        I_plus_pump * dq[0]**2 +
+        I_pi_pump * dq[1]**2 +
+        I_minus_pump * dq[2]**2
+    )
+    strength_pump = incoherent_pump * target_mask
+
+    incoherent_probe = (
+        I_plus_probe * dq[0]**2 +
+        I_pi_probe * dq[1]**2 +
+        I_minus_probe * dq[2]**2
+    )
+    strength_probe = incoherent_probe * target_mask
+
+    v_th = np.sqrt(2.0 * k * T / mass)
+    v_max = 350.0  # m/s
+    v_z = np.linspace(-v_max, v_max, N_v)
+    f_v = (1.0 / (np.sqrt(np.pi) * v_th)) * np.exp(-(v_z / v_th) ** 2)
+    kvz = (k_wave * v_z) / (2.0 * np.pi * 1e6)
+
+    nu_grid = nu_local_mhz[:, None, None, None]
+    kvz_grid = kvz[None, :, None, None]
+    f_grid = f_res_local[None, None, None, :]
+
+    if B_mag > 1e-6:
+        delta_Z = (mu_z_e[None, :] - mu_z_g[:, None]) * B_mag
+        delta_Z_grid = delta_Z[None, None, :, :]
+    else:
+        delta_Z_grid = 0.0
+
+    det_pump = nu_grid - kvz_grid - f_grid - delta_Z_grid
+    gamma_pump_ge = gamma_eff * np.sqrt(1.0 + s_pump * strength_pump)
+    L_pump = 1.0 / (1.0 + 4.0 * (det_pump / gamma_pump_ge[None, None, :, :]) ** 2)
+    R_pump = 0.5 * gamma_0 * s_pump * strength_pump[None, None, :, :] * L_pump
+
+    det_probe = nu_grid + kvz_grid - f_grid - delta_Z_grid
+    s_probe = kappa_probe * s_pump
+    gamma_probe_ge = gamma_eff * np.sqrt(1.0 + s_probe * strength_probe)
+    L_probe = 1.0 / (1.0 + 4.0 * (det_probe / gamma_probe_ge[None, None, :, :]) ** 2)
+    R_probe = 0.5 * gamma_0 * s_probe * strength_probe[None, None, :, :] * L_probe
+
+    R_total = R_pump + R_probe
+    n_g_p, n_e_p = _solve_steady_state_populations(R_total, gamma_0, b_decay, gamma_tr, Ng, Ne)
+    if s_probe > 1e-6:
+        n_g_u, n_e_u = _solve_steady_state_populations(R_probe, gamma_0, b_decay, gamma_tr, Ng, Ne)
+    else:
+        n_g_u = np.ones((*nu_local_mhz.shape, *v_z.shape, Ng)) / float(Ng)
+        n_e_u = np.zeros((*nu_local_mhz.shape, *v_z.shape, Ne))
+
+    R_probe_sensor = strength_probe[None, None, :, :] * L_probe
+    alpha_v_pumped = np.einsum('uvge,uvge->uv', n_g_p[:, :, :, None] - n_e_p[:, :, None, :], R_probe_sensor)
+    alpha_v_unpumped = np.einsum('uvge,uvge->uv', n_g_u[:, :, :, None] - n_e_u[:, :, None, :], R_probe_sensor)
+
+    alpha_pumped = np.trapezoid(alpha_v_pumped * f_v[None, :], v_z, axis=-1)
+    alpha_unpumped = np.trapezoid(alpha_v_unpumped * f_v[None, :], v_z, axis=-1)
+    diff = alpha_unpumped - alpha_pumped
+
+    return alpha_unpumped, alpha_pumped, diff
+
+
+def simulate_manifold_density_matrix(
+    nu_local_mhz,
+    manifold: HyperfineManifold,
+    Bx_gauss,
+    By_gauss,
+    Bz_gauss,
+    epsilon_pump,
+    epsilon_probe,
+    T,
+    s_pump,
+    kappa_probe,
+    gamma_eff,
+    gamma_tr,
+    N_v,
+):
+    """
+    Approach 2: Adiabatic Ground-State Density Matrix solver.
+    Solves for the slow ground-state density matrix rho_g (N_sub x N_sub)
+    with exact 3D Zeeman precession, Raman two-photon interference,
+    optical loss, and spontaneous emission feeding.
     """
     atom_info = manifold.atom_data
     mass = atom_info.mass
@@ -243,95 +390,213 @@ def simulate_manifold_zeeman(
     dq = atom_info.dq
     b_decay = atom_info.b_decay
     ground_F = atom_info.ground_F
+    ground_m = atom_info.ground_m
     excited_F = atom_info.excited_F
     E_e = atom_info.E_e
     mu_z_g = atom_info.mu_z_g
     mu_z_e = atom_info.mu_z_e
 
-    # Reference frequency for the manifold (e.g. cycling line)
+    g_target_indices = np.where(ground_F == F_g_target)[0]
+    N_sub = len(g_target_indices)
+    m_sub = ground_m[g_target_indices]
+    mu_g_sub = mu_z_g[g_target_indices]
+
+    mu_x_sub = atom_info.mu_x_mat_g[np.ix_(g_target_indices, g_target_indices)]
+    mu_y_sub = atom_info.mu_y_mat_g[np.ix_(g_target_indices, g_target_indices)]
+    mu_z_sub = atom_info.mu_z_mat_g[np.ix_(g_target_indices, g_target_indices)]
+
+    # Full ground-state Zeeman Hamiltonian in MHz
+    HZ_sub = mu_x_sub * Bx_gauss + mu_y_sub * By_gauss + mu_z_sub * Bz_gauss
+
     E_ref = E_e[excited_F == F_ref][0]
     f_res_local = E_e - E_ref
 
-    # Polarization fractions for transverse light propagating along quantization axis (k || B).
-    # pylcp dq ordering: index 0 is delta_m = +1 (sigma+), 1 is pi, 2 is delta_m = -1 (sigma-).
-    p_plus_pump = (1.0 + np.sin(2.0 * epsilon_pump)) / 2.0
-    p_minus_pump = (1.0 - np.sin(2.0 * epsilon_pump)) / 2.0
-    p_q_pump = np.array([p_plus_pump, 0.0, p_minus_pump])
+    E_plus_pump = np.sqrt(0.5 * (1.0 + np.sin(2.0 * epsilon_pump)))
+    E_minus_pump = np.sqrt(0.5 * (1.0 - np.sin(2.0 * epsilon_pump)))
 
-    # Probe beam polarization (independent parameters):
-    p_plus_probe = (1.0 + np.sin(2.0 * epsilon_probe)) / 2.0
-    p_minus_probe = (1.0 - np.sin(2.0 * epsilon_probe)) / 2.0
-    p_q_probe = np.array([p_plus_probe, 0.0, p_minus_probe])
+    E_plus_probe = np.sqrt(0.5 * (1.0 + np.sin(2.0 * epsilon_probe)))
+    E_minus_probe = np.sqrt(0.5 * (1.0 - np.sin(2.0 * epsilon_probe)))
 
-    # Resonant velocity window: atoms outside this window never hit pump & probe simultaneously
+    dq_sub = dq[:, g_target_indices, :]
+    V_pump = E_plus_pump * dq_sub[0] - E_minus_pump * dq_sub[2]
+    V_probe = E_plus_probe * dq_sub[0] - E_minus_probe * dq_sub[2]
+
     v_th = np.sqrt(2.0 * k * T / mass)
-    v_max = 350.0  # m/s (covers > 450 MHz Doppler shift)
+    v_max = 350.0
     v_z = np.linspace(-v_max, v_max, N_v)
     f_v = (1.0 / (np.sqrt(np.pi) * v_th)) * np.exp(-(v_z / v_th) ** 2)
-    kvz = (k_wave * v_z) / (2.0 * np.pi * 1e6)  # MHz
+    kvz = (k_wave * v_z) / (2.0 * np.pi * 1e6)
 
-    # Broadcasting shapes: (N_nu, 1, 1, 1), (1, N_v, 1, 1), (1, 1, 1, Ne), (1, 1, Ng, Ne)
     nu_grid = nu_local_mhz[:, None, None, None]
     kvz_grid = kvz[None, :, None, None]
     f_grid = f_res_local[None, None, None, :]
 
-    # Zeeman shifts: Delta nu_Z = Delta E_e - Delta E_g = (mu_z_e - mu_z_g) * B
-    if abs(B_gauss) > 1e-6:
-        delta_Z = (mu_z_e[None, :] - mu_z_g[:, None]) * B_gauss
+    B_mag = np.sqrt(Bx_gauss**2 + By_gauss**2 + Bz_gauss**2)
+    if B_mag > 1e-6:
+        delta_Z = (mu_z_e[None, :] - mu_g_sub[:, None]) * Bz_gauss
         delta_Z_grid = delta_Z[None, None, :, :]
     else:
         delta_Z_grid = 0.0
 
-    # Mask for transitions belonging to this manifold
-    target_mask = (ground_F == F_g_target)
-
-    # 1. PUMP TRANSITIONS (+z)
     det_pump = nu_grid - kvz_grid - f_grid - delta_Z_grid
-    strength_pump = np.sum(p_q_pump[:, None, None] * (dq ** 2), axis=0) * target_mask[:, None]
-    gamma_pump_ge = gamma_eff * np.sqrt(1.0 + s_pump * strength_pump)
-    L_pump = 1.0 / (1.0 + 4.0 * (det_pump / gamma_pump_ge[None, None, :, :]) ** 2)
-    R_pump = 0.5 * gamma_0 * s_pump * strength_pump[None, None, :, :] * L_pump
-
-    # 2. PROBE TRANSITIONS (-z)
     det_probe = nu_grid + kvz_grid - f_grid - delta_Z_grid
-    strength_probe = np.sum(p_q_probe[:, None, None] * (dq ** 2), axis=0) * target_mask[:, None]
+
+    L_pump = 1.0 / (1.0 + 4.0 * (det_pump / gamma_eff) ** 2)
+    L_probe = 1.0 / (1.0 + 4.0 * (det_probe / gamma_eff) ** 2)
+
     s_probe = kappa_probe * s_pump
-    gamma_probe_ge = gamma_eff * np.sqrt(1.0 + s_probe * strength_probe)
-    L_probe = 1.0 / (1.0 + 4.0 * (det_probe / gamma_probe_ge[None, None, :, :]) ** 2)
-    R_probe = 0.5 * gamma_0 * s_probe * strength_probe[None, None, :, :] * L_probe
+    L_pump_sym = 0.5 * (L_pump[:, :, :, None, :] + L_pump[:, :, None, :, :])
+    VV_pump = V_pump[:, None, :] * V_pump[None, :, :]
+    Gamma_p_mat = np.sum(VV_pump[None, None, :, :, :] * L_pump_sym, axis=-1) * (0.5 * gamma_0 * s_pump)
 
-    # 3. Steady-state populations for pumped measurement (both pump & probe present)
-    R_total = R_pump + R_probe
-    n_g_p, n_e_p = _solve_steady_state_populations(R_total, gamma_0, b_decay, gamma_tr, Ng, Ne)
+    L_probe_sym = 0.5 * (L_probe[:, :, :, None, :] + L_probe[:, :, None, :, :])
+    VV_probe = V_probe[:, None, :] * V_probe[None, :, :]
+    Gamma_pr_mat = np.sum(VV_probe[None, None, :, :, :] * L_probe_sym, axis=-1) * (0.5 * gamma_0 * s_probe)
 
-    # 4. Steady-state populations for unpumped reference measurement (probe alone)
-    if s_probe > 1e-6:
-        n_g_u, n_e_u = _solve_steady_state_populations(R_probe, gamma_0, b_decay, gamma_tr, Ng, Ne)
-    else:
-        n_g_u = np.ones((*nu_local_mhz.shape, *v_z.shape, Ng)) / float(Ng)
-        n_e_u = np.zeros((*nu_local_mhz.shape, *v_z.shape, Ne))
+    Gamma_total_mat = Gamma_p_mat + Gamma_pr_mat
 
-    # 5. Readout probe absorption (accounting for absorption and stimulated emission)
-    R_probe_sensor = strength_probe[None, None, :, :] * L_probe
-    alpha_v_pumped = np.einsum('uvge,uvge->uv', n_g_p[:, :, :, None] - n_e_p[:, :, None, :], R_probe_sensor)
-    alpha_v_unpumped = np.einsum('uvge,uvge->uv', n_g_u[:, :, :, None] - n_e_u[:, :, None, :], R_probe_sensor)
-    diff_v = alpha_v_unpumped - alpha_v_pumped
+    # Spontaneous decay feeding from excited states into target ground substates
+    b_decay_sub = b_decay[:, g_target_indices]
+    R_pump_ce = (0.5 * gamma_0 * s_pump) * (V_pump[None, None, :, :] ** 2) * L_pump
+    R_probe_ce = (0.5 * gamma_0 * s_probe) * (V_probe[None, None, :, :] ** 2) * L_probe
+    feed_total = np.einsum('uvce,ea->uvca', R_pump_ce + R_probe_ce, b_decay_sub)
+    feed_probe = np.einsum('uvce,ea->uvca', R_probe_ce, b_decay_sub)
 
-    # 6. 1D velocity integral over Maxwell-Boltzmann distribution
+    dim = N_sub * N_sub
+    shape_prefix = (len(nu_local_mhz), N_v)
+
+    def solve_density_matrix(Gamma_mat, feed_mat):
+        M = np.zeros((*shape_prefix, dim, dim), dtype=complex)
+        b_vec = np.zeros((*shape_prefix, dim, 1), dtype=complex)
+
+        for a in range(N_sub):
+            for b in range(N_sub):
+                idx_ab = a * N_sub + b
+                M[:, :, idx_ab, idx_ab] += gamma_tr
+
+                # Zeeman commutator: +i [HZ, rho]_ab = +i sum_c (HZ_ac rho_cb - rho_ac HZ_cb)
+                for c in range(N_sub):
+                    M[:, :, idx_ab, c * N_sub + b] += 1j * HZ_sub[a, c]
+                    M[:, :, idx_ab, a * N_sub + c] -= 1j * HZ_sub[c, b]
+                    M[:, :, idx_ab, c * N_sub + b] += 0.5 * Gamma_mat[:, :, a, c]
+                    M[:, :, idx_ab, a * N_sub + c] += 0.5 * Gamma_mat[:, :, c, b]
+
+                if a == b:
+                    b_vec[:, :, idx_ab, 0] = gamma_tr / float(Ng)
+                    for c in range(N_sub):
+                        idx_cc = c * N_sub + c
+                        M[:, :, idx_ab, idx_cc] -= feed_mat[:, :, c, a]
+
+        rho_vec = np.linalg.solve(M, b_vec)[..., 0]
+        return rho_vec.reshape((*shape_prefix, N_sub, N_sub))
+
+    rho_p = solve_density_matrix(Gamma_total_mat, feed_total)
+    rho_u = solve_density_matrix(Gamma_pr_mat, feed_probe)
+
+    alpha_v_pumped = np.real(np.einsum('uvab,uvba->uv', Gamma_pr_mat, rho_p))
+    alpha_v_unpumped = np.real(np.einsum('uvab,uvba->uv', Gamma_pr_mat, rho_u))
+
     alpha_pumped = np.trapezoid(alpha_v_pumped * f_v[None, :], v_z, axis=-1)
     alpha_unpumped = np.trapezoid(alpha_v_unpumped * f_v[None, :], v_z, axis=-1)
-    
-    # 7. Polarization mode overlap and Larmor precession dephasing
-    P_geom = (np.cos(delta_theta)**2 * np.cos(epsilon_pump - epsilon_probe)**2 + 
-              np.sin(delta_theta)**2 * np.sin(epsilon_pump + epsilon_probe)**2)
-    P_circ = 0.5 * (1.0 + np.sin(2.0 * epsilon_pump) * np.sin(2.0 * epsilon_probe))
-    omega_L = 4.4 * abs(B_gauss)
-    dephasing = 1.0 / (1.0 + (2.0 * omega_L / gamma_tr)**2) if gamma_tr > 0 else 1.0
-    P_eff = float(np.clip(P_circ + (P_geom - P_circ) * dephasing, 1e-4, 1.0))
-
-    diff = P_eff * (alpha_unpumped - alpha_pumped)
+    diff = alpha_unpumped - alpha_pumped
 
     return alpha_unpumped, alpha_pumped, diff
+
+
+def simulate_manifold_zeeman(
+    nu_local_mhz,
+    manifold: HyperfineManifold,
+    Bx_gauss,
+    By_gauss,
+    Bz_gauss,
+    epsilon_pump,
+    epsilon_probe,
+    T,
+    s_pump,
+    kappa_probe,
+    gamma_eff,
+    gamma_tr,
+    N_v,
+    model_type,
+):
+    """
+    Computes steady-state saturated absorption in an arbitrary 3D magnetic field B = (Bx, By, Bz)
+    using either Approach 2 ('density_matrix') or Approach 3 ('coherent_operator').
+    """
+    if model_type == "density_matrix":
+        return simulate_manifold_density_matrix(
+            nu_local_mhz,
+            manifold,
+            Bx_gauss,
+            By_gauss,
+            Bz_gauss,
+            epsilon_pump,
+            epsilon_probe,
+            T,
+            s_pump,
+            kappa_probe,
+            gamma_eff,
+            gamma_tr,
+            N_v,
+        )
+    elif model_type in ("coherent_operator", "coherent"):
+        return simulate_manifold_coherent_operator(
+            nu_local_mhz,
+            manifold,
+            Bx_gauss,
+            By_gauss,
+            Bz_gauss,
+            epsilon_pump,
+            epsilon_probe,
+            T,
+            s_pump,
+            kappa_probe,
+            gamma_eff,
+            gamma_tr,
+            N_v,
+        )
+    else:
+        raise ValueError(
+            f"Unknown model_type: '{model_type}'. Must be 'coherent_operator' or 'density_matrix'."
+        )
+
+
+PARAM_NAMES = [
+    "fsr",
+    "gamma_eff",
+    "gamma_tr",
+    "s_pump",
+    "kappa_probe",
+    "epsilon_pump",
+    "epsilon_probe",
+    "Bx_gauss",
+    "By_gauss",
+    "Bz_gauss",
+    "f0_0",
+    "f0_1",
+    "f0_2",
+    "f0_3",
+]
+
+PARAM_ALIASES = {
+    "bx": "Bx_gauss",
+    "bx_gauss": "Bx_gauss",
+    "by": "By_gauss",
+    "by_gauss": "By_gauss",
+    "bz": "Bz_gauss",
+    "bz_gauss": "Bz_gauss",
+    "b_z": "Bz_gauss",
+    "b": "B_gauss",
+    "b_gauss": "B_gauss",
+    "b_field": "B_gauss",
+    "magnetic_field": "B_gauss",
+    "eps_pump": "epsilon_pump",
+    "eps_probe": "epsilon_probe",
+    "g_eff": "gamma_eff",
+    "g_tr": "gamma_tr",
+    "s": "s_pump",
+    "kappa": "kappa_probe",
+}
 
 
 @dataclass
@@ -344,7 +609,9 @@ class GlobalFitResult:
     kappa_probe: float
     epsilon_pump: float
     epsilon_probe: float
-    delta_theta: float
+    Bx_gauss: float
+    By_gauss: float
+    Bz_gauss: float
     f0: list[float]
     amp: list[float]
     bg: list[float]
@@ -353,25 +620,33 @@ class GlobalFitResult:
     success: bool
     x_sub: list[np.ndarray]
     y_sub: list[np.ndarray]
+    fixed_params: dict[str, float]
+    model_type: str
+
+    @property
+    def B_gauss(self) -> float:
+        """Total magnetic field magnitude in Gauss: sqrt(Bx^2 + By^2 + Bz^2)."""
+        return float(np.sqrt(self.Bx_gauss**2 + self.By_gauss**2 + self.Bz_gauss**2))
 
 
 def fit_global_forward_model(
     freq_fringes,
     diff_signal,
+    fringe_windows,
     p0,
     bounds_lower,
     bounds_upper,
-    B_gauss,
+    fixed_params,
     subsample_step,
     max_nfev,
+    model_type,
 ):
     """
     Fits a unified forward physical model across all four rubidium D2 manifolds simultaneously.
-    Initial parameters (p0) and bounds are passed explicitly from the caller.
+    Fringe windows, initial parameters (p0), bounds, fixed parameters, and model_type are passed explicitly from the caller.
     """
     slices = []
-    for m in MANIFOLDS:
-        r_min, r_max = m.fringe_window
+    for m, (r_min, r_max) in zip(MANIFOLDS, fringe_windows):
         mask = (freq_fringes >= r_min) & (freq_fringes <= r_max)
         x_m = freq_fringes[mask]
         y_m = diff_signal[mask]
@@ -382,9 +657,50 @@ def fit_global_forward_model(
             'y': y_m[::step],
         })
 
-    def residuals(p):
-        fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe, delta_th = p[0:8]
-        f0s = p[8:12]
+    # Normalize fixed parameters dict
+    fixed_norm = {}
+    if fixed_params:
+        for k, v in fixed_params.items():
+            if k == "f0" and hasattr(v, "__len__"):
+                for idx, val in enumerate(v):
+                    fixed_norm[f"f0_{idx}"] = float(val)
+            else:
+                norm_k = PARAM_ALIASES.get(k.lower(), k)
+                if norm_k == "B_gauss":
+                    fixed_norm["Bx_gauss"] = 0.0
+                    fixed_norm["By_gauss"] = 0.0
+                    fixed_norm["Bz_gauss"] = float(v)
+                elif norm_k in PARAM_NAMES:
+                    fixed_norm[norm_k] = float(v)
+
+    free_indices = []
+    p0_free = []
+    bounds_lower_free = []
+    bounds_upper_free = []
+    full_fixed_values = {}
+
+    for idx, name in enumerate(PARAM_NAMES):
+        if name in fixed_norm:
+            full_fixed_values[idx] = fixed_norm[name]
+        else:
+            free_indices.append(idx)
+            p0_free.append(p0[idx])
+            bounds_lower_free.append(bounds_lower[idx])
+            bounds_upper_free.append(bounds_upper[idx])
+
+    def _build_full_p(p_free):
+        p_full = np.empty(len(PARAM_NAMES), dtype=float)
+        for i_free, orig_idx in enumerate(free_indices):
+            p_full[orig_idx] = p_free[i_free]
+        for orig_idx, fix_val in full_fixed_values.items():
+            p_full[orig_idx] = fix_val
+        return p_full
+
+    def residuals(p_free):
+        p_full = _build_full_p(p_free)
+        fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe = p_full[0:7]
+        Bx_g, By_g, Bz_g = p_full[7:10]
+        f0s = p_full[10:14]
 
         all_res = []
         for i, s in enumerate(slices):
@@ -392,16 +708,18 @@ def fit_global_forward_model(
             _, _, diff = simulate_manifold_zeeman(
                 nu,
                 s['m'],
-                B_gauss,
+                Bx_g,
+                By_g,
+                Bz_g,
                 eps_pump,
                 eps_probe,
-                delta_th,
                 295.0,
                 s_pump,
                 kappa_pr,
                 g_eff,
                 g_tr,
                 81,
+                model_type,
             )
             X = np.column_stack([diff, np.ones_like(diff)])
             c, _, _, _ = np.linalg.lstsq(X, s['y'], rcond=None)
@@ -409,18 +727,30 @@ def fit_global_forward_model(
             all_res.append(y_fit - s['y'])
         return np.concatenate(all_res)
 
-    res = least_squares(
-        residuals,
-        p0,
-        bounds=(bounds_lower, bounds_upper),
-        ftol=1e-3,
-        xtol=1e-3,
-        max_nfev=max_nfev,
-        verbose=0,
-    )
+    if len(free_indices) > 0:
+        res = least_squares(
+            residuals,
+            p0_free,
+            bounds=(bounds_lower_free, bounds_upper_free),
+            ftol=1e-3,
+            xtol=1e-3,
+            max_nfev=max_nfev,
+            verbose=0,
+        )
+        p_opt = _build_full_p(res.x)
+        cost = float(res.cost)
+        nfev = int(res.nfev)
+        success = bool(res.success)
+    else:
+        p_opt = _build_full_p([])
+        res_arr = residuals([])
+        cost = float(0.5 * np.sum(res_arr ** 2))
+        nfev = 1
+        success = True
 
-    fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe, delta_th = res.x[0:8]
-    f0s = res.x[8:12]
+    fsr, g_eff, g_tr, s_pump, kappa_pr, eps_pump, eps_probe = p_opt[0:7]
+    Bx_g, By_g, Bz_g = p_opt[7:10]
+    f0s = p_opt[10:14]
 
     amps, bgs = [], []
     for i, s in enumerate(slices):
@@ -428,16 +758,18 @@ def fit_global_forward_model(
         _, _, diff = simulate_manifold_zeeman(
             nu,
             s['m'],
-            B_gauss,
+            Bx_g,
+            By_g,
+            Bz_g,
             eps_pump,
             eps_probe,
-            delta_th,
             295.0,
             s_pump,
             kappa_pr,
             g_eff,
             g_tr,
             81,
+            model_type,
         )
         X = np.column_stack([diff, np.ones_like(diff)])
         c, _, _, _ = np.linalg.lstsq(X, s['y'], rcond=None)
@@ -452,13 +784,17 @@ def fit_global_forward_model(
         kappa_probe=float(kappa_pr),
         epsilon_pump=float(eps_pump),
         epsilon_probe=float(eps_probe),
-        delta_theta=float(delta_th),
+        Bx_gauss=float(Bx_g),
+        By_gauss=float(By_g),
+        Bz_gauss=float(Bz_g),
         f0=[float(x) for x in f0s],
         amp=amps,
         bg=bgs,
-        cost=float(res.cost),
-        nfev=int(res.nfev),
-        success=bool(res.success),
+        cost=cost,
+        nfev=nfev,
+        success=success,
         x_sub=[s['x'] for s in slices],
         y_sub=[s['y'] for s in slices],
+        fixed_params=fixed_norm,
+        model_type=model_type,
     )

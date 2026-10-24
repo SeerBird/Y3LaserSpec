@@ -1,3 +1,4 @@
+import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -34,17 +35,16 @@ def plot_polarization_effects(resolution:int):
         ("Opposite Helicity (+6.6°, -14.9°)", 6.6, -14.9, "darkorange", ":"),
     ]
 
-    # Target lower ground state manifolds
+    # Target lower ground state manifolds: (manifold, fringe_window, f0_guess, label)
     target_manifolds = [
-        (pm.MANIFOLDS[3], "87Rb F=1 (Ground F=1 -> Excited F'=0, 1, 2)"),
-        (pm.MANIFOLDS[2], "85Rb F=2 (Ground F=2 -> Excited F'=1, 2, 3)"),
+        (pm.MANIFOLDS[3], (27.1, 28.1), 27.28, "87Rb F=1 (Ground F=1 -> Excited F'=0, 1, 2)"),
+        (pm.MANIFOLDS[2], (20.6, 21.4), 20.88, "85Rb F=2 (Ground F=2 -> Excited F'=1, 2, 3)"),
     ]
 
     fig, axes = plt.subplots(2, 1, figsize=(13, 11))
 
-    for ax, (m, title_label) in zip(axes, target_manifolds):
+    for ax, (m, (r_min, r_max), f0, title_label) in zip(axes, target_manifolds):
         # Extract experimental slice
-        r_min, r_max = m.fringe_window
         mask = (freq_fringes >= r_min) & (freq_fringes <= r_max)
 
         x_exp = freq_fringes[mask]
@@ -52,7 +52,6 @@ def plot_polarization_effects(resolution:int):
         step = max(1, len(x_exp)//resolution)
         x_exp = x_exp[::step]
         y_exp = y_exp[::step]
-        f0 = m.f0_guess
 
         # Frequency evaluation grid around manifold line center
         nu_eval = (x_exp - f0) * fsr
@@ -125,7 +124,8 @@ def plot_polarization_effects(resolution:int):
         fontweight="bold",
     )
     plt.tight_layout()
-    output_path = "polarization_effects_lower_states.png"
+    os.makedirs("figures", exist_ok=True)
+    output_path = os.path.join("figures", "polarization_effects_lower_states.png")
     plt.savefig(output_path, dpi=200)
     print(f"Saved discrete polarization comparison plot to '{output_path}'.", flush=True)
     plt.close(fig)
@@ -216,7 +216,8 @@ def plot_qwp_rotation_sweep():
         fontweight="bold",
     )
     plt.tight_layout()
-    output_sweep_path = "polarization_qwp_rotation_map.png"
+    os.makedirs("figures", exist_ok=True)
+    output_sweep_path = os.path.join("figures", "polarization_qwp_rotation_map.png")
     plt.savefig(output_sweep_path, dpi=200)
     print(f"Saved continuous QWP sweep plot to '{output_sweep_path}'.", flush=True)
     plt.close(fig)
