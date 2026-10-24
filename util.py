@@ -22,6 +22,10 @@ class ManifoldData:
     ref_index: int
     ABhfs_guess: tuple[float, float]
 
+    @property
+    def names(self):
+        return [f"{self.name}->{Fp}" for Fp in self.Fp_levels]
+
 
 MANIFOLDS_CONFIG = [
     ManifoldData('87Rb F=2', 1.5, 1.5, [1, 2, 3], 2,  # Reference peak is F'=3 (cycling transition)
