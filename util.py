@@ -1,5 +1,6 @@
 # region maths
 from dataclasses import dataclass
+import numpy as np
 
 
 def casimir_energy(F, I, J, A, B):
@@ -24,7 +25,11 @@ class ManifoldData:
 
     @property
     def names(self):
-        return [f"{self.name}->{Fp}" for Fp in self.Fp_levels]
+        f = [int(x) if float(x).is_integer() else x for x in self.Fp_levels]
+        true_names = [f"F'={x}" for x in f]
+        i, j = np.triu_indices(len(f), k=1)
+        co_names = [f"CO {f[a]}-{f[b]}" for a, b in zip(i, j)]
+        return true_names + co_names
 
 
 MANIFOLDS_CONFIG = [
