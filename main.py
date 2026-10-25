@@ -134,13 +134,10 @@ def fit_hyperfine_multiplets(freq, diff, windows=None, fsr=374.74):
 
         ref_idx = cfg.ref_index
 
-        x_mid = float(np.mean(x_mhz))
-
         def evaluate_model(p, x_eval):
-            nu_ref, A, B, gamma, c0, c1, c2 = p[:7]
-            amps = p[7:]
-            dx_eval = (x_eval - x_mid) / 1000.0
-            y_eval = c0 + c1 * dx_eval + c2 * dx_eval**2
+            nu_ref, A, B, gamma, bg = p[:5]
+            amps = p[5:]
+            y_eval = np.full_like(x_eval, bg)
             E_all = calc_peak_offsets(A, B, cfg.I, cfg.J, cfg.Fp_levels)
             offsets = E_all - E_all[ref_idx]
             for k in range(len(offsets)):
@@ -171,23 +168,22 @@ def fit_hyperfine_multiplets(freq, diff, windows=None, fsr=374.74):
 
         bg_init = float(np.percentile(y_data, 10))
         amp_init = float(np.max(y_data) - bg_init) / 3.0
-        p0 = np.array([nu_ref_init, A_init, B_init, 20.0, bg_init, 0.0, 0.0] + [amp_init] * 6, dtype=float)
+        p0 = np.array([nu_ref_init, A_init, B_init, 20.0, bg_init] + [amp_init] * 6, dtype=float)
 
-        lower = np.array([w_min * fsr - 100.0, 5.0, 0.0, 8.0, -1.0, -0.5, -2.0] + [0.0] * 6, dtype=float)
-        upper = np.array([w_max * fsr + 100.0, 150.0, 60.0, 32.0, 2.0, 0.5, 2.0] + [2.0] * 6, dtype=float)
+        lower = np.array([w_min * fsr - 100.0, 5.0, 0.0, 8.0, -1.0] + [0.0] * 6, dtype=float)
+        upper = np.array([w_max * fsr + 100.0, 150.0, 60.0, 32.0, 2.0] + [2.0] * 6, dtype=float)
 
         p0 = np.clip(p0, lower + 1e-4, upper - 1e-4)
 
         fit = least_squares(residuals, p0, bounds=(lower, upper), ftol=1e-5, xtol=1e-5)
-        nu_ref, A_fit, B_fit, gamma_fit, c0_fit, c1_fit, c2_fit = fit.x[:7]
-        amps_fit = fit.x[7:]
+        nu_ref, A_fit, B_fit, gamma_fit, bg_fit = fit.x[:5]
+        amps_fit = fit.x[5:]
         E_all_fit = calc_peak_offsets(A_fit, B_fit, cfg.I, cfg.J, cfg.Fp_levels)
         peak_offsets = E_all_fit - E_all_fit[ref_idx]
 
         x_dense = np.linspace(x_mhz[0], x_mhz[-1], 300)
         y_dense = evaluate_model(fit.x, x_dense)
-        dx_dense = (x_dense - x_mid) / 1000.0
-        bg_dense = c0_fit + c1_fit * dx_dense + c2_fit * dx_dense**2
+        bg_dense = np.full_like(x_dense, bg_fit)
 
         results.append({
             'name': cfg.name,
@@ -196,10 +192,8 @@ def fit_hyperfine_multiplets(freq, diff, windows=None, fsr=374.74):
             'gamma': float(gamma_fit),
             'f0_mhz': float(nu_ref),
             'f0_fringe': float(nu_ref / fsr),
+            'bg': float(bg_fit),
             'bg_dense': bg_dense,
-            'c0': float(c0_fit),
-            'c1': float(c1_fit),
-            'c2': float(c2_fit),
             'amplitudes': amps_fit,
             'peak_freqs': nu_ref + peak_offsets,
             'peak_names': cfg.names,
@@ -263,8 +257,8 @@ def plot_hyperfine_fits(results, title="Hyperfine Multiplet Casimir Fits", save_
         ax.plot(res['x_fit'], res['y_fit'], color='crimson', linewidth=2.0, label='Total Casimir Fit')
         
         x_dense = res['x_fit']
-        bg_dense = res.get('bg_dense', np.full_like(x_dense, res.get('c0', 0.0)))
-        ax.plot(x_dense, bg_dense, color='gray', linestyle=':', linewidth=1.5, label='Doppler/Power Baseline')
+        bg_dense = res.get('bg_dense', np.full_like(x_dense, res.get('bg', 0.0)))
+        ax.plot(x_dense, bg_dense, color='gray', linestyle=':', linewidth=1.5, label='Background Offset')
 
         gamma = res['gamma']
         peak_names = res.get('peak_names', [])
