@@ -170,7 +170,7 @@ def fit_hyperfine_multiplets(freq, diff, windows=None, fsr=374.74):
         amp_init = float(np.max(y_data) - bg_init) / 3.0
         p0 = np.array([nu_ref_init, A_init, B_init, 20.0, bg_init] + [amp_init] * 6, dtype=float)
 
-        lower = np.array([w_min * fsr - 100.0, 5.0, 0.0, 8.0, -1.0] + [0.0] * 6, dtype=float)
+        lower = np.array([w_min * fsr - 100.0, 5.0, 0.0, 8.0, -1.0] + [-2.0] * 6, dtype=float)
         upper = np.array([w_max * fsr + 100.0, 150.0, 60.0, 32.0, 2.0] + [2.0] * 6, dtype=float)
 
         p0 = np.clip(p0, lower + 1e-4, upper - 1e-4)
@@ -192,6 +192,7 @@ def fit_hyperfine_multiplets(freq, diff, windows=None, fsr=374.74):
             'gamma': float(gamma_fit),
             'f0_mhz': float(nu_ref),
             'f0_fringe': float(nu_ref / fsr),
+            'fsr': float(fsr),
             'bg': float(bg_fit),
             'bg_dense': bg_dense,
             'amplitudes': amps_fit,
@@ -215,18 +216,25 @@ def plot_it(fp_name, pumped_name, unpumped_name, cut_edges=False, title="", fsr=
     freq, fabry, pumped, unpumped = prep_data(fp_name, pumped_name, unpumped_name, cut_edges)
     diff = pumped - unpumped
     freq_mhz = freq * fsr
-    plt.suptitle(title)
-    plt.subplot(2, 1, 1)
-    plt.plot(freq_mhz, pumped, label="Pumped")
-    plt.plot(freq_mhz, unpumped, label="Unpumped")
-    plt.xlabel("Frequency (MHz)")
-    plt.ylabel("Voltage (V)")
-    plt.legend()
-    plt.subplot(2, 1, 2)
-    plt.plot(freq_mhz, diff, label="Diff")
-    plt.xlabel("Frequency (MHz)")
-    plt.ylabel("Voltage (V)")
-    plt.legend()
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    if title:
+        fig.suptitle(title, fontsize=12, fontweight='bold')
+    ax1.plot(freq_mhz, pumped, label="Pumped")
+    ax1.plot(freq_mhz, unpumped, label="Unpumped")
+    ax1.set_ylabel("Voltage (V)")
+    ax1.legend()
+    ax1.grid(True, linestyle=':', alpha=0.5)
+
+    sec_ax1 = ax1.secondary_xaxis('top', functions=(lambda nu: nu / fsr, lambda fringe: fringe * fsr))
+    sec_ax1.set_xlabel("Fabry-Pérot Fringe Index")
+
+    ax2.plot(freq_mhz, diff, label="Diff", color='tab:green')
+    ax2.set_xlabel("Frequency (MHz)")
+    ax2.set_ylabel("Voltage (V)")
+    ax2.legend()
+    ax2.grid(True, linestyle=':', alpha=0.5)
+
+    plt.tight_layout()
     plt.show()
 
 
@@ -242,23 +250,27 @@ def plot_magnetic():
                 title=f"{fields[i]} mA")
 
 
-def plot_hyperfine_fits(results, title="Hyperfine Multiplet Casimir Fits", save_path="figures/hyperfine_multiplets_fits.png"):
+def plot_hyperfine_fits(results, title="Hyperfine Multiplet Casimir Fits",
+                        save_path="figures/hyperfine_multiplets_fits.png", fsr=374.74):
     """
     Plots the fitted Casimir Lorentzians against measured data for all manifolds,
     including individual contributing Lorentzian components on the same axes.
     """
     fig, axs = plt.subplots(2, 2, figsize=(15, 10))
-    plt.suptitle(title, fontsize=13, fontweight='bold')
+    fig.suptitle(title, fontsize=13, fontweight='bold', y=0.995)
     colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:purple', 'tab:brown', 'tab:olive']
 
     for i, res in enumerate(results):
         ax = axs.flat[i]
-        ax.plot(res['x_data'], res['y_data'], label='Measured Diff', color='black', alpha=0.6, linewidth=1.2)
-        ax.plot(res['x_fit'], res['y_fit'], color='crimson', linewidth=2.0, label='Total Casimir Fit')
-        
+        ax.plot(res['x_data'], res['y_data'], label='Measured Diff', color='black', alpha=0.6,
+                linewidth=1.2)
+        ax.plot(res['x_fit'], res['y_fit'], color='crimson', linewidth=2.0,
+                label='Total Casimir Fit')
+
         x_dense = res['x_fit']
         bg_dense = res.get('bg_dense', np.full_like(x_dense, res.get('bg', 0.0)))
-        ax.plot(x_dense, bg_dense, color='gray', linestyle=':', linewidth=1.5, label='Background Offset')
+        ax.plot(x_dense, bg_dense, color='gray', linestyle=':', linewidth=1.5,
+                label='Background Offset')
 
         gamma = res['gamma']
         peak_names = res.get('peak_names', [])
@@ -267,15 +279,19 @@ def plot_hyperfine_fits(results, title="Hyperfine Multiplet Casimir Fits", save_
             amp = res['amplitudes'][k]
             nu_k = res['peak_freqs'][k]
             y_comp = bg_dense + amp / (1.0 + 4.0 * ((x_dense - nu_k) / gamma) ** 2)
-            name_k = peak_names[k] if k < len(peak_names) else f"Peak {k+1}"
-            if amp > 1e-4:
-                color_k = colors[k % len(colors)]
-                ax.plot(x_dense, y_comp, '--', color=color_k, linewidth=1.2, label=name_k)
-                ax.fill_between(x_dense, bg_dense, y_comp, color=color_k, alpha=0.08)
+            name_k = peak_names[k] if k < len(peak_names) else f"Peak {k + 1}"
+            color_k = colors[k % len(colors)]
+            ax.plot(x_dense, y_comp, '--', color=color_k, linewidth=1.2, label=name_k)
+            ax.fill_between(x_dense, bg_dense, y_comp, color=color_k, alpha=0.08)
+
+
+        local_fsr = res.get('fsr', fsr)
+        sec_ax = ax.secondary_xaxis('top', functions=(lambda nu: nu / local_fsr, lambda fringe: fringe * local_fsr))
+        sec_ax.set_xlabel("Fabry-Pérot Fringe Index")
 
         ax.set_title(
             f"{res['name']}: A = {res['A']:.2f} MHz, B = {res['B']:.2f} MHz ($\\Gamma$ = {res['gamma']:.1f} MHz)",
-            fontsize=11, fontweight='bold'
+            fontsize=11, fontweight='bold', pad=25
         )
         ax.set_xlabel("Frequency (MHz)")
         ax.set_ylabel("Voltage (V)")
@@ -286,15 +302,21 @@ def plot_hyperfine_fits(results, title="Hyperfine Multiplet Casimir Fits", save_
     if save_path:
         plt.savefig(save_path, dpi=150)
     plt.show()
+
+
 # endregion
+def fit_hyperfine(fp_name, pumped_name, unpumped_name, windows,title = ""):
+    freq, fabry, pumped, unpumped = prep_data(fp_name, pumped_name, unpumped_name)
+    diff = pumped - unpumped
+    results = fit_hyperfine_multiplets(freq, diff, windows=windows)
+    for res in results:
+        print(
+            f"{res['name']}: A = {res['A']:.2f} MHz, B = {res['B']:.2f} MHz, Gamma = {res['gamma']:.1f} MHz, cost = {res['cost']:.4f}")
+    plot_hyperfine_fits(results,title = title)
+
 
 if __name__ == "__main__":
-    freq, fabry, pumped, unpumped = prep_data("data/Session 9/F1.CSV",
-                                              "data/Session 9/P1.CSV",
-                                              "data/Session 9/U1.CSV")
-    diff = pumped - unpumped
-    windows_s9 = [(3.8, 5.3), (7.2, 8.5), (15.0, 16.2), (21.5, 22.8)]
-    results = fit_hyperfine_multiplets(freq, diff, windows=windows_s9)
-    for res in results:
-        print(f"{res['name']}: A = {res['A']:.2f} MHz, B = {res['B']:.2f} MHz, Gamma = {res['gamma']:.1f} MHz, cost = {res['cost']:.4f}")
-    plot_hyperfine_fits(results)
+    fit_hyperfine("data/Session 9/F1.CSV",
+                  "data/Session 9/P1.CSV",
+                  "data/Session 9/U1.CSV",
+                  [(3.8, 5.3), (7.2, 8.5), (15.0, 16.2), (21.5, 22.8)])
