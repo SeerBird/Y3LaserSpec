@@ -1,7 +1,8 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize_scalar
+from scipy.interpolate import interp1d
 import pandas as pd
 
 from util import casimir_energy, MANIFOLDS_CONFIG
@@ -48,7 +49,7 @@ def cut_edges_off(fabry, pumped, unpumped, peaks, peak_index, index):
             pumped[left_edge:right_edge + 1], peaks, peak_index, index)
 
 
-def prep_data(fp_name, pumped_name, unpumped_name, cut_edges=False):
+def prep_data(fp_name, pumped_name, unpumped_name, cut_edges=False, align_shift=True):
     _, fabry = load(fp_name)
     _, pumped = load(pumped_name)
     _, unpumped = load(unpumped_name)
@@ -58,6 +59,21 @@ def prep_data(fp_name, pumped_name, unpumped_name, cut_edges=False):
     if cut_edges:
         fabry, pumped, unpumped, peaks, peak_index, index = cut_edges_off(fabry, pumped, unpumped,
                                                                           peaks, peak_index, index)
+    if align_shift:
+        u_interp = interp1d(index, unpumped, kind='cubic', bounds_error=False, fill_value='extrapolate')
+        pad = 200
+        idx_eval = index[pad:-pad]
+        p_eval = pumped[pad:-pad]
+        bg_mask = np.abs(p_eval - unpumped[pad:-pad]) < 0.04
+        if np.sum(bg_mask) < 1000:
+            bg_mask = np.ones_like(p_eval, dtype=bool)
+        res = minimize_scalar(
+            lambda s: np.mean((p_eval[bg_mask] - u_interp(idx_eval[bg_mask] + s)) ** 2),
+            bounds=(-150, 150),
+            method='bounded'
+        )
+        unpumped = u_interp(index + res.x)
+
     freq_fit = np.poly1d(np.polyfit(peaks, peak_index, 5))
     freq = freq_fit(index)
     if show_freq_fit:
