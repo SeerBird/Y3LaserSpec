@@ -25,8 +25,8 @@ def sqrt_model(P, gamma0, psat):
 def lin_model(P, gamma0, m):
     return gamma0 + m * P
 
-# Powers from recovered xlsx
-df_pwr = pd.read_csv('data/Session 10/Power variation/Powers_recovered.csv')
+# Powers from user Excel file
+df_pwr = pd.read_excel('data/Session 10/Power variation/Powers.xlsx')
 powers = df_pwr['Power_uW'].values
 runs = df_pwr['Run'].values
 fsr = 374.74
@@ -236,7 +236,10 @@ for idx, r in enumerate(res_87):
     ax.set_ylabel('Signal (mV)', fontsize=9.5)
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right', fontsize=8.5)
-    ax.text(0.03, 0.72, f'Peak Amp: {r[\'amp\']:.2f} mV\nRMS Res: {r[\'res_rms\']:.3f} mV\nLorentzian: {r[\'eta\']*100:.0f}%', 
+    amp_val = r['amp']
+    res_val = r['res_rms']
+    eta_val = r['eta'] * 100
+    ax.text(0.03, 0.72, f'Peak Amp: {amp_val:.2f} mV\nRMS Res: {res_val:.3f} mV\nLorentzian: {eta_val:.0f}%', 
             transform=ax.transAxes, fontsize=8.5, bbox=dict(boxstyle='round,pad=0.25', facecolor='white', alpha=0.85))
 
 plt.tight_layout()
@@ -267,7 +270,10 @@ for idx, r in enumerate(res_85):
     ax.set_ylabel('Signal (mV)', fontsize=9.5)
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right', fontsize=8.5)
-    ax.text(0.03, 0.72, f'Peak Amp: {r[\'amp\']:.2f} mV\nRMS Res: {r[\'res_rms\']:.3f} mV\nLorentzian: {r[\'eta\']*100:.0f}%', 
+    amp_val = r['amp']
+    res_val = r['res_rms']
+    eta_val = r['eta'] * 100
+    ax.text(0.03, 0.72, f'Peak Amp: {amp_val:.2f} mV\nRMS Res: {res_val:.3f} mV\nLorentzian: {eta_val:.0f}%', 
             transform=ax.transAxes, fontsize=8.5, bbox=dict(boxstyle='round,pad=0.25', facecolor='white', alpha=0.85))
 
 plt.tight_layout()
