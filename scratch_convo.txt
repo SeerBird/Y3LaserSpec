@@ -1,0 +1,286 @@
+=== TURN 1 | Type: USER_INPUT ===
+<USER_REQUEST>
+Why would the fractional saturation depth not be linear with the measured power?
+Regardless, that was again a good argument, just slightly hard for me to follow. Could you gather the whole reasoning line into a single, well-structured argument, and explain from start to finish how zeeman alignment is formed and the lifetime of its components, how the zeeman alignment affects linewidth, and how this then changes with our B-field. Please make it clear which basis the components/m states are in, and include all the detail from the last 2 answers.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-27T01:05:50Z.
+</ADDITIONAL_METADATA>
+
+=== TURN 2 | Type: PLANNER_RESPONSE ===
+Here is the complete, self-contained explanation from start to finish, starting with your question about why fractional saturation depth is non-linear with power, and then building the atomic physics step by step in a single explicit basis.
+
+---
+
+### Part 0: Why is Fractional Saturation Depth Not Linear with Laser Power?
+
+In saturated absorption spectroscopy, the pump beam bleaches the resonant velocity class ($v_z \approx 0$). As a function of the saturation parameter $s_0 = I_{\text{pump}} / I_{\text{sat}} = P / P_{\text{sat}}$, the absorption coefficient of that velocity class drops from its unsaturated value $\alpha_0$ to:
+$$\alpha_{\text{sat}}(P) = \frac{\alpha_0}{\sqrt{1 + P / P_{\text{sat}}}} \quad \left(\text{or } \frac{\alpha_0}{1 + P / P_{\text{sat}}} \text{ for a single homogeneous packet}\right)$$
+Therefore, the fractional saturation depth—the height of the Lamb dip $\Delta\alpha = \alpha_0 - \alpha_{\text{sat}}$ divided by the unpumped Doppler absorption $\alpha_0$—is:
+$$\frac{\Delta V_{\text{peak}}}{\Delta V_{\text{Doppler}}} \propto 1 - \frac{1}{\sqrt{1 + P / P_{\text{sat}}}}$$
+
+* **At very low power ($P \ll P_{\text{sat}}$):** A Taylor expansion gives $\frac{\Delta\alpha}{\alpha_0} \approx \frac{1}{2}\frac{P}{P_{\text{sat}}}$, which is **linear in $P$**.
+* **At moderate-to-high power ($P \gtrsim P_{\text{sat}}$):** Once the pump has already bleached a significant fraction of the atoms in the $v_z = 0$ velocity class, doubling the power cannot bleach more than $100\%$ of the available atoms—there are fewer ground-state atoms left to excite. Thus the fractional depth **bends over sublinearly (saturates)**.
+  * You can see this directly in your Session 10 data: increasing power by $8.7\times$ (from $99\,\mu\text{W}$ to $859\,\mu\text{W}$) only increases the $^{87}\text{Rb}$ cycling peak fractional depth by $4.2\times$ ($3.2\% \to 13.4\%$) and the $CO(2,3)$ crossover depth by $3.0\times$ ($15.0\% \to 44.5\%$, because crossovers have a lower effective saturation power $P_{\text{sat}}$ and saturate even earlier).
+
+---
+
+### Part 1: Coordinate System and Choice of Quantization Basis
+
+To keep the math unambiguous, we define two sets of axes and stick to them throughout:
+
+1. **Fixed Laboratory Axes ($\hat{x}, \hat{y}, \hat{z}$):**
+   * $\hat{z}$: Laser beam propagation axis ($\vec{k}_{\text{pump}} = +\hat{z}$, $\vec{k}_{\text{probe}} = -\hat{z}$). Your solenoid coil also points along $\hat{z}$.
+   * $\hat{x}$: Horizontal transverse axis. In Session 10, $\hat{\epsilon}_{\text{pump}} = \hat{x}$.
+   * $\hat{y}$: Vertical transverse axis. In Session 10, $\hat{\epsilon}_{\text{probe}} = \hat{y}$. (In Session 9, $\hat{\epsilon}_{\text{pump}} \parallel \hat{\epsilon}_{\text{probe}}$).
+   * The total magnetic field vector in the cell is $\vec{B} = B_x\hat{x} + B_y\hat{y} + B_z\hat{z}$, where $B_y \approx 0.45\text{ G}$ is Earth's dominant vertical field component and $B_z = B_{z0} + B_{\text{coil}}$ is controlled by your coil.
+
+2. **Atomic Quantization Basis ($\hat{z}_Q = \hat{b} \equiv \frac{\vec{B}}{|\vec{B}|}$):**
+   * Unless stated otherwise, **all magnetic sublevels $|F, m_B\rangle$ ($m_B \in \{-F, \dots, +F\}$) and $|F', m'_B\rangle$ ($m'_B \in \{-F', \dots, +F'\}$) are quantized along the direction of the total magnetic field $\hat{b} = \vec{B}/|\vec{B}|$.**
+   * In this $\hat{b}$-basis:
+     * A **$\pi$ transition** ($\Delta m_B = 0$) is driven by the component of $\vec{E}$ **parallel to $\vec{B}$**.
+     * **$\sigma^+$ and $\sigma^-$ transitions** ($\Delta m_B = \pm 1$) are driven by the components of $\vec{E}$ **perpendicular to $\vec{B}$**.
+
+---
+
+### Part 2: Why Coherent Dark States Cannot Form on the Cycling Transitions ($F \to F'=F+1$)
+
+A **dark state** $|\psi_{\text{dark}}\rangle = \sum_m c_m |F, m\rangle$ is a ground-state superposition that cannot absorb light:
+$$\hat{V}|\psi_{\text{dark}}\rangle = -(\hat{\vec{d}}\cdot\vec{E})|\psi_{\text{dark}}\rangle = 0$$
+
+Whether a dark state exists is a coordinate-independent property of the operator $\hat{V}$ (changing basis by a unitary rotation cannot create or destroy a zero eigenvalue). To check if a linearly polarized beam $\vec{E}$ has a dark state on $F \to F'$, temporarily inspect the basis quantized along $\vec{E}$ itself, where $\vec{E}$ drives purely $\Delta m_E = 0$ transitions $|F, m_E\rangle \to |F', m_E\rangle$:
+$$\hat{V}|\psi\rangle = \sum_{m_E=-F}^{F} c_{m_E} \langle F, m_E; 1, 0 | F', m_E \rangle |F', m_E\rangle$$
+Since the excited states $|F', m_E\rangle$ are mutually orthogonal, $\hat{V}|\psi\rangle = 0$ requires $c_{m_E}\,\langle F, m_E; 1, 0 | F', m_E \rangle = 0$ for every $m_E$:
+* **If $F' = F - 1$:** There are $2F+1$ ground states but only $2F-1$ excited states; $m_E = \pm F$ have no excited targets ($\text{CG} = 0$), creating **2 dark states**.
+* **If $F' = F$:** $\langle F, 0; 1, 0 | F, 0 \rangle = 0$, so $m_E = 0$ is **1 dark state** (which looks like a coherent superposition $\frac{1}{\sqrt{2}}(|+1\rangle + |-1\rangle)$ if written in a perpendicular basis).
+* **If $F' = F + 1$ (your cycling transitions $^{87}\text{Rb } F=2 \to F'=3$ and $^{85}\text{Rb } F=3 \to F'=4$):** There are $2F+3$ excited states—more than the $2F+1$ ground states—and the Clebsch-Gordan coefficient is:
+  $$\langle F, m_E; 1, 0 | F+1, m_E \rangle = \sqrt{\frac{(F+1)^2 - m_E^2}{(F+1)(2F+1)}} > 0 \quad \text{for all } m_E \in \{-F, \dots, +F\}$$
+  Because $(F+1)^2 - m_E^2 \ge 2F+1 > 0$, **none of the coefficients is zero**. Thus $c_{m_E} = 0$ for all $m_E$: **no dark state (coherent or incoherent) exists on a cycling transition.**
+
+---
+
+### Part 3: How Zeeman Alignment is Formed and Why Larmor Precession Only Washes Out Its Off-Diagonal Components
+
+Now return to our standard **$\hat{b} = \vec{B}/|\vec{B}|$ basis** ($|F, m_B\rangle$).
+
+Even without dark states, a linearly polarized pump beam tilted at angle $\alpha_{\text{pump}}$ to $\vec{B}$ excites different $m_B$ states at different rates and creates a ground-state density matrix $\hat{\rho}_g$ with elements $\rho_{m_B, m'_B} = \langle F, m_B | \hat{\rho}_g | F, m'_B \rangle$.
+
+In the $\hat{b}$-basis, the magnetic Hamiltonian is diagonal: $\hat{H}_B |F, m_B\rangle = \hbar\Omega_L m_B |F, m_B\rangle$, where $\Omega_L = g_F \mu_B |\vec{B}|/\hbar$ is the Larmor frequency. The Liouville–von Neumann equation for each matrix element $\rho_{m_B, m'_B}$ is:
+$$\frac{d}{dt}\rho_{m_B, m'_B} = \underbrace{-i(m_B - m'_B)\Omega_L\,\rho_{m_B, m'_B}}_{\text{Larmor precession}} \;-\; \underbrace{\gamma_{\text{tr}}\big(\rho_{m_B, m'_B} - \rho_{m_B, m'_B}^{\text{eq}}\big)}_{\text{Transit relaxation}} \;+\; \underbrace{R_{m_B, m'_B}^{\text{pump}}}_{\text{Optical pumping}}$$
+Setting $d\rho/dt = 0$ in steady state gives:
+$$\rho_{m_B, m'_B} - \rho_{m_B, m'_B}^{\text{eq}} = \frac{R_{m_B, m'_B}^{\text{pump}}}{\gamma_{\text{tr}} + i(m_B - m'_B)\Omega_L}$$
+
+Look at how the two types of matrix elements behave when $\Omega_L \gg \gamma_{\text{tr}}$ (in your lab, even at the minimum field $|\vec{B}| \approx 0.45\text{ G}$, $\Omega_L/2\pi \approx 315\text{ kHz}$ is $10\times$ larger than the transit rate $\gamma_{\text{tr}}/2\pi \approx 30\text{ kHz}$):
+
+1. **Off-Diagonal Coherences in the $\vec{B}$-Basis ($m_B \ne m'_B$, i.e. Transverse Alignment):**
+   * Because $m_B - m'_B = \pm 1, \pm 2 \ne 0$, the denominator is dominated by $i(m_B - m'_B)\Omega_L$:
+     $$|\rho_{m_B, m'_B}| \approx \frac{|R_{m_B, m'_B}^{\text{pump}}|}{|m_B - m'_B|\,\Omega_L} \sim \mathcal{O}\!\left(\frac{\gamma_{\text{tr}}}{\Omega_L}\right) \to 0$$
+   * **Physically:** Any coherence between different $m_B$ states represents an anisotropy *perpendicular* to $\vec{B}$ (an azimuthal $\phi$-dependence around $\vec{B}$). As atoms precess several full turns around $\vec{B}$ during their transit across the beam, this transverse coherence dephases on the fast timescale $\Omega_L^{-1}$ and is **washed out**.
+
+2. **Diagonal Populations in the $\vec{B}$-Basis ($m_B = m'_B$, i.e. Longitudinal Alignment $n_g(m_B) \equiv \rho_{m_B, m_B}$):**
+   * When $m_B = m'_B$, the factor $(m_B - m'_B)\Omega_L$ is **identically zero**:
+     $$\Delta n_g(m_B) \equiv \rho_{m_B, m_B} - \frac{1}{2F+1} = \frac{R_{m_B, m_B}^{\text{pump}}}{\gamma_{\text{tr}}}$$
+   * **Physically:** The states $|F, m_B\rangle$ are the energy eigenstates of $\hat{H}_B$ ($[\hat{H}_B, |F, m_B\rangle\langle F, m_B|] = 0$). **Larmor precession around $\vec{B}$ cannot change an atom's projection $m_B$ along $\vec{B}$!**
+   * Therefore, any population imbalance $\Delta n_g(m_B)$ created along the $\vec{B}$-axis (e.g., more atoms in $m_B = 0$ than in $m_B = \pm 2$, or vice versa) is completely unaffected by Larmor precession and **lives for the full transit lifetime $\tau_{\text{tr}} = \gamma_{\text{tr}}^{-1} \approx 5\text{--}8\,\mu\text{s}$**.
+
+> **Geometric Summary:** If the pump creates an ellipsoid of aligned atoms tilted at angle $\alpha_{\text{pump}}$ to $\vec{B}$, Larmor precession spins that ellipsoid rapidly around $\vec{B}$. The spinning washes out all asymmetry *perpendicular* to $\vec{B}$ in time $\Omega_L^{-1}$ (killing $\rho_{m_B, m'_B}$ for $m_B \ne m'_B$), leaving behind an axisymmetric ellipsoid (cigar or pancake) **aligned along $\vec{B}$** (the diagonal populations $n_g(m_B)$), which persists for the full transit time $\gamma_{\text{tr}}^{-1}$.
+
+---
+
+### Part 4: Coupling of Any Linear Polarization to the Surviving $m_B$ Populations ($\pi, \sigma^+, \sigma^-$ Combined)
+
+Since only the diagonal populations $n_g(m_B)$ in the $\vec{B}$-basis survive Larmor precession, we need the total transition rate $C_{\text{total}}(\hat{\epsilon}, m_B)$ of a linearly polarized beam $\hat{\epsilon}$ out of each sublevel $|F, m_B\rangle$.
+
+For $^{87}\text{Rb}$ ($F=2 \to F'=3$), normalize the squared Clebsch-Gordan coefficients by $3$ so the unpolarized average is $\bar{C} = \frac{2F'+1}{2F+1} = \frac{7}{5} = 1.40$:
+* Pure $\pi$ coupling ($\Delta m_B = 0$):
+  $$C_\pi(m_B) = 3\langle 2, m_B; 1, 0 | 3, m_B \rangle^2 = \frac{3(9 - m_B^2)}{15} = \big[1.0,\; 1.6,\; 1.8,\; 1.6,\; 1.0\big] \quad (m_B = -2, -1, 0, +1, +2)$$
+  *(Strongest at $m_B = 0$, weakest at $m_B = \pm 2$; funnels population **into** $m_B = 0$).*
+* Pure $\sigma^+ + \sigma^-$ coupling ($\Delta m_B = \pm 1$):
+  By spherical tensor symmetry, $C_\pi(m_B) + C_{\sigma^+}(m_B) + C_{\sigma^-}(m_B) = 3\bar{C} = 4.20$, so the average of $\sigma^+$ and $\sigma^-$ is:
+  $$C_\perp(m_B) \equiv \frac{C_{\sigma^+}(m_B) + C_{\sigma^-}(m_B)}{2} = \frac{3\bar{C} - C_\pi(m_B)}{2} = \big[1.6,\; 1.3,\; 1.2,\; 1.3,\; 1.6\big]$$
+  *(Weakest at $m_B = 0$, strongest at $m_B = \pm 2$; funnels population **into** $m_B = \pm 2$).*
+
+Now take a linearly polarized beam $\hat{\epsilon}$ at angle $\alpha_\epsilon$ to $\hat{b}$ ($\cos\alpha_\epsilon = \hat{\epsilon}\cdot\hat{b}$). Relative to $\hat{b}$, its intensity splits into:
+* A $\pi$ fraction parallel to $\hat{b}$: $p_\pi = \cos^2\alpha_\epsilon = (\hat{\epsilon}\cdot\hat{b})^2$.
+* Equal $\sigma^+$ and $\sigma^-$ fractions perpendicular to $\hat{b}$: $p_{\sigma^+} = p_{\sigma^-} = \frac{1}{2}\sin^2\alpha_\epsilon = \frac{1 - p_\pi}{2}$.
+
+Summing all three transitions ($\pi + \sigma^+ + \sigma^-$) gives the exact coupling to $|F, m_B\rangle$:
+$$\begin{aligned}
+C_{\text{total}}(\hat{\epsilon}, m_B) &= p_\pi\,C_\pi(m_B) + p_{\sigma^+}\,C_{\sigma^+}(m_B) + p_{\sigma^-}\,C_{\sigma^-}(m_B) \\
+&= p_\pi\,C_\pi(m_B) + (1 - p_\pi)\,C_\perp(m_B) \\
+&= p_\pi\,C_\pi(m_B) + (1 - p_\pi)\,\frac{3\bar{C} - C_\pi(m_B)}{2} \\
+&= \bar{C} + P_2(\cos\alpha_\epsilon)\,\big(C_\pi(m_B) - \bar{C}\big), \qquad \text{where } P_2(\cos\alpha_\epsilon) \equiv \frac{3(\hat{\epsilon}\cdot\hat{b})^2 - 1}{2} \in \left[-\frac{1}{2}, +1\right]
+\end{aligned}$$
+
+Look at what the factor $P_2(\cos\alpha_\epsilon)$ means physically:
+* **$\alpha_\epsilon = 0^\circ$ ($\hat{\epsilon} \parallel \vec{B}$, pure $\pi$):** $P_2 = +1 \implies C_{\text{total}} = C_\pi(m_B)$ (favors $m_B = 0$).
+* **$\alpha_\epsilon = 90^\circ$ ($\hat{\epsilon} \perp \vec{B}$, pure $\sigma^+ + \sigma^-$):** $P_2 = -\frac{1}{2} \implies C_{\text{total}} = C_\perp(m_B)$ (favors $m_B = \pm 2$).
+* **$\alpha_\epsilon = 54.7^\circ$ (Magic Angle, $\cos^2\alpha_\epsilon = 1/3$):** $P_2 = 0 \implies C_{\text{total}} = \bar{C} = 1.40$ for **all** $m_B$ (completely blind to $m_B$ alignment!).
+
+---
+
+### Part 5: How Longitudinal Alignment Changes the Linewidth
+
+When the probe beam passes through the vapor, its differential transmission signal $\Delta T_{\text{probe}}(\Delta\nu) \propto \alpha_{\text{unpumped}} - \alpha_{\text{pumped}}$ is the sum of two physical effects with **very different widths**:
+
+$$\Delta T_{\text{probe}}(\Delta\nu) \propto \underbrace{\Delta T_{\text{sat}}(\Delta\nu)}_{\substack{\text{(1) Excited-state saturation} \\ \text{Width } \sim \Gamma_0\sqrt{1+s_0}}} \;-\; \underbrace{\sum_{m_B=-F}^{F} \big(C_{\text{total}}(\hat{\epsilon}_{\text{probe}}, m_B) - \bar{C}\big)\,\Delta n_g(m_B, \Delta\nu)}_{\substack{\text{(2) Ground-state Zeeman alignment} \\ \text{Broadened across wings } (\tau_{\text{tr}} \gg \tau_{\text{spont}})}}$$
+
+1. **Term (1) — Two-Level Saturation ($\Delta T_{\text{sat}} > 0$):**
+   The pump excites atoms out of the ground state into the short-lived excited state ($\tau_{\text{spont}} = 26.2\text{ ns}$, $\Gamma_0 = 6.07\text{ MHz}$). This reduces probe absorption and always produces a **positive peak** of width $\Gamma_{\text{sat}} \approx \Gamma_0\frac{1+\sqrt{1+s_0}}{2}$.
+
+2. **Term (2) — Ground-State Zeeman Alignment:**
+   Because the ground-state populations $\Delta n_g(m_B)$ relax at the slow transit rate $\gamma_{\text{tr}} \approx 30\text{ kHz}$ rather than $\Gamma_0 = 6.07\text{ MHz}$, the optical-pumping saturation parameter is $s_{\text{opt}} \sim s_0 \frac{\Gamma_0}{\gamma_{\text{tr}}} \sim 100\,s_0 \gg s_0$. Even in the Lorentzian wings ($\Delta\nu = \pm 8\text{ to }\pm 20\text{ MHz}$), atoms scatter enough photons during their $6\,\mu\text{s}$ transit to redistribute $\Delta n_g(m_B)$. Thus **Term (2) forms a broad skirt/pedestal much wider than Term (1)**.
+
+   What is the **sign** of Term (2)?
+   * When a pump with $P_2(\hat{\epsilon}_{\text{pump}}\cdot\hat{b}) > 0$ (predominantly $\pi_B$) excites the cycling transition, spontaneous decay funnels ground-state population **into** $m_B = 0$ (where $C_\pi(m_B) - \bar{C} > 0$), so $\Delta n_g(m_B)$ has the **same sign pattern** as $P_2(\hat{\epsilon}_{\text{pump}}\cdot\hat{b})\big(C_\pi(m_B) - \bar{C}\big)$!
+   * Substituting $C_{\text{total}}(\hat{\epsilon}_{\text{probe}}, m_B) - \bar{C} = P_2(\hat{\epsilon}_{\text{probe}}\cdot\hat{b})\big(C_\pi(m_B) - \bar{C}\big)$ into Term (2) gives:
+     $$\text{Term (2)} \propto -\,\mathcal{M}(\hat{b}) \sum_{m_B} \big(C_\pi(m_B) - \bar{C}\big)^2, \qquad \text{where } \mathcal{M}(\hat{b}) \equiv P_2(\hat{\epsilon}_{\text{pump}}\cdot\hat{b})\,P_2(\hat{\epsilon}_{\text{probe}}\cdot\hat{b})$$
+
+   This yields three regimes depending on the sign of $\mathcal{M}(\hat{b})$:
+   * **Regime I ($\mathcal{M}(\hat{b}) < 0$, Opposite $P_2$ signs for pump and probe):**
+     Term (2) is **POSITIVE** (reduced probe absorption). The pump pushes atoms into $m_B$ states to which the probe couples *weakly*. This adds a **broad positive optical-pumping pedestal** underneath Term (1), making the composite peak **significantly wider**.
+   * **Regime II ($\mathcal{M}(\hat{b}) = 0$, Magic Angle $\alpha = 54.7^\circ$):**
+     Term (2) is **ZERO**. The broad optical-pumping pedestal vanishes completely, leaving only the narrower two-level saturation peak Term (1).
+   * **Regime III ($\mathcal{M}(\hat{b}) > 0$, Same $P_2$ sign for pump and probe):**
+     Term (2) is **NEGATIVE** (enhanced ground-state probe absorption). The pump funnels atoms into $m_B$ states to which the probe couples *strongly*. Subtracting this broad negative skirt from the narrower positive peak Term (1) **pulls the wings down faster than a Lorentzian and narrows the apparent FWHM**.
+
+---
+
+### Part 6: How This Explains Your Magnetic Field Scan and Session 9 vs. Session 10
+
+Now apply Part 5 directly to your laboratory measurements:
+
+#### 1. What happened when you scanned the coil current in Session 10 ($\hat{\epsilon}_{\text{pump}} = \hat{x}$ horizontal, $\hat{\epsilon}_{\text{probe}} = \hat{y}$ vertical):
+* **At $I_{\text{coil}} = 0\text{ mA}$ (`Mag R01`, $\text{FWHM}_{87} = 9.65\text{ MHz}$):**
+  The magnetic field is dominated by Earth's vertical field: $\vec{B} \approx B_y\hat{y}$ ($|\vec{B}| \approx 0.45\text{ G}$), so the quantization axis is **vertical ($\hat{b} \approx \hat{y}$)**.
+  * The vertical probe ($\hat{y}$) is **parallel** to $\hat{b}$ ($\alpha_{\text{probe}} \approx 0^\circ \implies P_2(\text{probe}) \approx +1$, pure $\pi_B$).
+  * The horizontal pump ($\hat{x}$) is **perpendicular** to $\hat{b}$ ($\alpha_{\text{pump}} \approx 90^\circ \implies P_2(\text{pump}) = -\frac{1}{2}$, pure $\sigma^\pm_B$).
+  * Thus $\mathcal{M} = \left(-\frac{1}{2}\right)(+1) = -\frac{1}{2} < 0$ (**Regime I**): the $\sigma^\pm_B$ pump drives atoms toward $m_B = \pm 2$, where the $\pi_B$ probe absorbs weakest ($C_\pi(\pm 2) = 1.0 < 1.4$). This creates a **broad positive optical-pumping pedestal**, giving a wide peak ($9.65\text{ MHz}$).
+
+* **At $I_{\text{coil}} = 19\text{--}24\text{ mA}$ (`Mag R03`, Minimum $\text{FWHM}_{87} = 8.19\text{ MHz}$):**
+  At $19\text{--}24\text{ mA}$, your 600-turn solenoid generates $B_z \approx 1.3\text{--}1.6\text{ G}$ along the beam axis $\hat{z}$ (which is $3\times$ larger than Earth's vertical field $B_y \approx 0.45\text{ G}$).
+  * This **tilts the total magnetic field vector $\vec{B} = B_y\hat{y} + B_z\hat{z}$ away from the vertical axis $\hat{y}$ to point mostly along the beam axis $\hat{z}$** ($\alpha_{\text{probe}} \approx 70^\circ\text{--}75^\circ$, well past the $54.7^\circ$ magic angle!).
+  * Now **both** the horizontal pump ($\hat{x} \perp \hat{z}$) and the vertical probe ($\hat{y} \perp \hat{z}$) are nearly perpendicular to $\hat{b} \approx \hat{z}$! Larmor precession around $\hat{z}$ washes out the $90^\circ$ azimuthal angle between $\hat{x}$ and $\hat{y}$ on the $\Omega_L^{-1}$ timescale, so both beams act as $\sigma^\pm_B$ along $\hat{z}$:
+    $$P_2(\text{pump}) \approx -0.50, \quad P_2(\text{probe}) \approx -0.35 \implies \mathcal{M} \approx +0.17 > 0 \quad (\text{\textbf{Regime III}})$$
+  * This eliminates the Regime I optical-pumping pedestal and slightly pinches the outer wings, dropping the high-power FWHM from $9.65\text{ MHz}$ to its minimum of **$8.19\text{ MHz}$**!
+  * *(Notice how this resolves the $24\text{ mA}$ puzzle: $24\text{ mA}$ was **not** cancelling a $1.6\text{ G}$ longitudinal stray field down to $B_z = 0$; at $B_z = 0$ the field is vertical and the line is wide! Instead, $24\text{ mA}$ applied $B_z \approx 1.5\text{ G}$ to rotate $\vec{B}$ from the vertical $\hat{y}$ axis into the longitudinal $\hat{z}$ axis so that $\mathcal{M}$ flipped from $-0.42$ to $+0.17$!)*
+
+* **At $I_{\text{coil}} = 39\text{--}69\text{ mA}$ (`Mag R05–R08`, $\text{FWHM}_{87} \to 9.71\text{ MHz}$):**
+  Now $B_z$ reaches $2.5\text{--}4.6\text{ G}$, and ordinary **Zeeman splitting** ($\Delta\nu_Z = \mu_B |\vec{B}| (g_{F'} m'_B - g_F m_B) \approx 1.4\text{ MHz/G} \times |\vec{B}|$) splits the $\sigma^+_B$ and $\sigma^-_B$ resonances apart by several MHz, broadening the peak again.
+
+#### 2. Why Session 9 ($\text{lin} \parallel \text{lin}$) was $10.3\text{--}15\text{ MHz}$ while Session 10 went down to $5.5\text{--}6.1\text{ MHz}$:
+* In Session 9 (`Prot 1–4, 6` at $0\text{ mA}$), both beams were parallel ($\mathcal{M}_{\parallel} = [P_2]^2 \ge 0$), and their crossing FWHM was $9.45\text{--}9.82\text{ MHz}$—nearly identical to Session 10's max-power ($859\,\mu\text{W}$) width of $8.5\text{--}9.6\text{ MHz}$.
+* Session 9 never showed $6\text{ MHz}$ widths because **every dataset in Session 9 was taken at high pump and probe power** (the unpumped Doppler absorption depth in Session 9 was $750\text{--}3300\text{ mV}$, i.e., $3.5\text{--}15\times$ higher probe power than Session 10's $215\text{ mV}$, and the pump fractional saturation on $CO(2,3)$ was $40\%\text{--}48\%$ in every Session 9 run, equivalent to Session 10's highest power of $859\,\mu\text{W}$).
+* In Session 10, after setting the coil to the $24\text{ mA}$ alignment optimum, you attenuated the probe and swept the pump power down by $40\times$ (to $20\,\mu\text{W}$), removing the $\sim 2.5\text{--}3.5\text{ MHz}$ of power broadening.
+* Finally, at the lowest powers ($20\text{--}100\,\mu\text{W}$), the slightly negative wing alignment ($\mathcal{M} \approx +0.17 > 0$) suppresses the outer $\pm 10\text{--}20\text{ MHz}$ skirts below a pure Lorentzian (pulling $\pm 20\text{ MHz}$ Lorentzian fits down by $\sim 0.4\text{ MHz}$), while for $^{85}\text{Rb}$ the straight-line background across $[-18, +18]\text{ MHz}$ cuts across the concave-upward tail of the $CO(3,4)$ peak (pulling $^{85}\text{Rb}$ down by another $\sim 0.7\text{ MHz}$). When you stack the 9 low-power $^{87}\text{Rb}$ runs to remove single-run noise bias, the direct half-maximum crossing width is **$6.10\text{ MHz}$**—right at the natural linewidth $\Gamma_0 = 6.07\text{ MHz}$.
+
+=== TURN 3 | Type: USER_INPUT ===
+<USER_REQUEST>
+Why does pi coupling funnel populations into m_B = 0 if it's strongest at m_B = 0, pumping out of it? Why is the profile of the zeeman alignment effect broad if its lifetime is long? How does a negative broad peak make our data peak sharper?
+What does it mean for polarization vectors to point opposite ways? Don't they oscillate back and forth? Since the beams are counter-propagatng, won't the phase between them be different at each point in the cell?
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-27T01:37:48Z.
+</ADDITIONAL_METADATA>
+
+=== TURN 4 | Type: PLANNER_RESPONSE ===
+Each of these four questions points to a subtle piece of physics where verbal shortcuts sound contradictory until you look at the exact equations. Here are the direct, mathematical answers to all four.
+
+---
+
+### 1. Why does $\pi$ coupling funnel population *into* $m_B = 0$ if it excites *out of* $m_B = 0$ fastest?
+
+Your intuition is completely reasonable: if a $\pi$-polarized pump ($\Delta m_B = 0$) excites $m_B = 0$ fastest ($C_\pi(0) = 1.80$) and $m_B = \pm 2$ slowest ($C_\pi(\pm 2) = 1.00$), shouldn't atoms get evacuated from $m_B = 0$ and pile up in $m_B = \pm 2$?
+
+On $F \to F-1$ or $F \to F$, they do! **The reason the exact opposite happens on $F \to F+1$ ($F=2 \to F'=3$) is the asymmetry of spontaneous emission from a wider excited manifold ($2F'+1 = 7$ states) back into a narrower ground manifold ($2F+1 = 5$ states).**
+
+Follow a single scattering cycle in the $\vec{B}$-basis:
+1. Suppose an atom starts in the outer ground state $|F=2, m_B = +2\rangle$ and absorbs a $\pi$ photon ($\Delta m_B = 0$) to reach $|F'=3, m'_B = +2\rangle$.
+2. Now it spontaneously decays back to $F=2$ by emitting a $\pi$ ($\Delta m_B = 0$), $\sigma^+$ ($\Delta m_B = -1$), or $\sigma^-$ ($\Delta m_B = +1$) photon:
+   * Can it decay **outward** to $m_B = +3$? **No—the ground state $F=2$ has no $m_B = +3$ sublevel!**
+   * It can **only** decay back to $m_B = +2$ (branching fraction $B(+2 \leftarrow +2) = \frac{1}{3} = 33.3\%$) or **inward** to $m_B = +1$ (branching fraction $B(+1 \leftarrow +2) = \frac{2}{3} = 66.7\%$).
+3. Conversely, if an atom is in $|F=2, m_B = +1\rangle$ and gets $\pi$-excited to $|F'=3, m'_B = +1\rangle$, its Clebsch-Gordan branching fractions to decay to $m_B = \{0, +1, +2\}$ are:
+   * **Inward** to $m_B = 0$: $B(0 \leftarrow +1) = \frac{6}{15} = \mathbf{40.0\%}$
+   * Same level $m_B = +1$: $B(+1 \leftarrow +1) = \frac{8}{15} = 53.3\%$
+   * **Outward** to $m_B = +2$: $B(+2 \leftarrow +1) = \frac{1}{15} = \mathbf{6.7\%}$
+
+Now write the steady-state detailed balance between adjacent ground sublevels (rate jumping outward $=$ rate jumping inward):
+* **Between $m_B = +1$ and $m_B = +2$:**
+  $$\begin{aligned}
+  \text{Rate}(+1 \to +2) &= n_g(+1)\,\underbrace{C_\pi(+1)}_{1.60}\,\underbrace{B(+2 \leftarrow +1)}_{1/15 \, (6.7\%)} = 0.1067\,n_g(+1) \\
+  \text{Rate}(+2 \to +1) &= n_g(+2)\,\underbrace{C_\pi(+2)}_{1.00}\,\underbrace{B(+1 \leftarrow +2)}_{2/3 \, (66.7\%)} = 0.6667\,n_g(+2)
+  \end{aligned}$$
+  Setting them equal gives:
+  $$\frac{n_g(+1)}{n_g(+2)} = \frac{0.6667}{0.1067} = \mathbf{6.25}$$
+  Even though $C_\pi(+1)$ is $1.6\times$ larger than $C_\pi(+2)$, the inward spontaneous decay branching ($66.7\%$) is **$10\times$ larger** than the outward decay branching ($6.7\%$)—so inward spontaneous emission wins by $10 / 1.6 = 6.25$ to $1$!
+* **Between $m_B = 0$ and $m_B = +1$:**
+  $$\frac{n_g(0)}{n_g(+1)} = \frac{C_\pi(+1)\,B(0 \leftarrow +1)}{C_\pi(0)\,B(+1 \leftarrow 0)} = \frac{1.60 \times 0.40}{1.80 \times 0.20} = \frac{0.64}{0.36} = \mathbf{1.78}$$
+  Again, the $2:1$ inward decay bias ($0.40$ vs. $0.20$) beats the $1.125:1$ excitation ratio ($1.80$ vs. $1.60$), giving a net $11.1 : 6.25 : 1$ pile-up in $m_B = 0$ relative to $m_B = \pm 2$.
+
+---
+
+### 2. Why is the Zeeman alignment profile *broad* in frequency if its lifetime $\tau_{\text{tr}}$ is *long*?
+
+This is a classic distinction in atomic physics between **coherence lifetime broadening** ($\Delta\nu \sim 1/2\pi\tau$, where a long lifetime makes a resonance *narrow*) and **saturation/power broadening of a population hole** ($\Delta\nu = \Gamma_0\sqrt{1 + R_0\tau}$, where a long relaxation time makes a bleached feature *broad*).
+
+Here is the exact algebra showing why the alignment profile is broad:
+* **Step 1 (The optical absorption profile still has width $\Gamma_0 = 6.07\text{ MHz}$):**
+  To optically pump an atom, the laser must first excite the optical transition $5S_{1/2} \to 5P_{3/2}$. Because the $5P_{3/2}$ excited state decays in $\tau_{\text{spont}} = 26.2\text{ ns}$, the single-photon optical pumping rate as a function of laser detuning $\Delta\nu$ is a Lorentzian of width $\Gamma_0 = 6.07\text{ MHz}$:
+  $$R_{\text{pump}}(\Delta\nu) = \frac{R_0}{1 + 4(\Delta\nu / \Gamma_0)^2}$$
+  *(The long ground-state transit time $\tau_{\text{tr}}$ does **not** replace $\Gamma_0$ in the optical absorption cross-section!)*
+* **Step 2 (Steady-state balance between optical pumping and transit relaxation):**
+  At detuning $\Delta\nu$, the ground-state alignment $\Delta n_g(\Delta\nu)$ builds up at rate $R_{\text{pump}}(\Delta\nu)$ and decays at the transit rate $\gamma_{\text{tr}} = 1/\tau_{\text{tr}}$:
+  $$\frac{d}{dt}\Delta n_g = R_{\text{pump}}(\Delta\nu)\,\big(\Delta n_g^{\text{max}} - \Delta n_g\big) - \gamma_{\text{tr}}\,\Delta n_g = 0$$
+  Solving for $\Delta n_g(\Delta\nu)$ and substituting $R_{\text{pump}}(\Delta\nu)$ gives:
+  $$\Delta n_g(\Delta\nu) = \Delta n_g^{\text{max}}\,\frac{R_{\text{pump}}(\Delta\nu)}{\gamma_{\text{tr}} + R_{\text{pump}}(\Delta\nu)} = \Delta n_g^{\text{max}}\,\frac{S_{\text{opt}}}{1 + S_{\text{opt}} + 4(\Delta\nu / \Gamma_0)^2}$$
+  where $S_{\text{opt}} \equiv \frac{R_0}{\gamma_{\text{tr}}} = R_0\,\tau_{\text{tr}}$ is the **total number of photons scattered during the transit time $\tau_{\text{tr}}$**.
+* **Step 3 (Read off the FWHM of $\Delta n_g(\Delta\nu)$):**
+  Divide numerator and denominator by $1 + S_{\text{opt}}$:
+  $$\Delta n_g(\Delta\nu) = \left(\frac{S_{\text{opt}}\,\Delta n_g^{\text{max}}}{1 + S_{\text{opt}}}\right) \frac{1}{1 + 4\left(\frac{\Delta\nu}{\Gamma_0\sqrt{1 + R_0\tau_{\text{tr}}}}\right)^2} \implies \text{FWHM}_{\text{align}} = \Gamma_0\sqrt{1 + R_0\,\tau_{\text{tr}}}$$
+  **Why does a long $\tau_{\text{tr}}$ make $\text{FWHM}_{\text{align}}$ broad?**
+  Because $\tau_{\text{tr}} \approx 6\,\mu\text{s}$ is so long ($230\times$ longer than $\tau_{\text{spont}} = 26.2\text{ ns}$), an atom stays in the beam long enough to get optically pumped **even when the laser is detuned far out in the Lorentzian wings** ($\Delta\nu = \pm 10\text{ MHz}$)! At line center ($\Delta\nu = 0$), the alignment hits $100\%$ ceiling early in the transit and saturates (flattens out), while the wings keep growing throughout the $6\,\mu\text{s}$ transit—producing a heavily power-broadened profile of width $\Gamma_0\sqrt{1 + R_0\tau_{\text{tr}}} \gg \Gamma_0$.
+
+---
+
+### 3. How does subtracting a broad peak (negative Term 2) make a narrow peak sharper?
+
+Write the net signal $y(\Delta\nu)$ as a narrow positive two-level saturation peak $y_1(\Delta\nu)$ ($\text{FWHM}_1 = 6\text{ MHz}$, height $1.0$) minus a broad alignment trough $y_2(\Delta\nu)$ ($\text{FWHM}_2 = 18\text{ MHz}$, depth $-0.30$):
+$$y(\Delta\nu) = \underbrace{\frac{1.0}{1 + 4(\Delta\nu / 6)^2}}_{\text{Narrow saturation peak}} \;-\; \underbrace{\frac{0.30}{1 + 4(\Delta\nu / 18)^2}}_{\text{Broad alignment trough}}$$
+
+Now check the numbers at three points:
+1. **At the peak center ($\Delta\nu = 0$):**
+   $$y(0) = 1.0 - 0.30 = \mathbf{0.70} \implies \text{The new half-maximum threshold is } \frac{0.70}{2} = \mathbf{0.35}$$
+2. **At the old half-maximum detuning ($\Delta\nu = \pm 3.0\text{ MHz}$):**
+   At $\Delta\nu = \pm 3\text{ MHz}$, the narrow peak has dropped to half its height ($y_1(\pm 3) = 0.50$), **but the $18\text{ MHz}$-wide negative trough has barely decayed at all**:
+   $$y_2(\pm 3) = -\frac{0.30}{1 + 4(3/18)^2} = -0.27$$
+   So the net signal at $\Delta\nu = \pm 3\text{ MHz}$ is already down to:
+   $$y(\pm 3) = 0.50 - 0.27 = \mathbf{0.23} \quad (\text{well below the } 0.35 \text{ half-maximum!})$$
+3. **Where does $y(\Delta\nu)$ actually cross $0.35$?**
+   At $\Delta\nu = \pm 2.30\text{ MHz}$, giving a **net FWHM of $4.60\text{ MHz}$ instead of $6.00\text{ MHz}$**!
+
+**Geometric picture:** Over the central $\pm 4\text{ MHz}$ core of the narrow peak, a broad $18\text{ MHz}$ negative peak acts like a downward shift of the peak floor by $\approx -0.27$, while far out in the wings ($\pm 20\text{ MHz}$) both curves return to $0$. Pushing the floor under the central core downward without lowering the outer baseline slices off the bottom $27\%$ of the narrow peak—leaving only the narrower upper tip sticking up above the baseline!
+
+---
+
+### 4. What about the oscillating electric fields and the spatially varying phase between counter-propagating beams?
+
+#### A. "Don't polarization vectors oscillate back and forth?"
+**Yes!** A linearly polarized electric field $\vec{E}(z, t) = E_0 \hat{\epsilon}\cos(kz - \omega t)$ oscillates between $+\hat{\epsilon}$ and $-\hat{\epsilon}$ at the optical frequency $\omega/2\pi = 384\text{ THz}$.
+* Therefore, $+\hat{\epsilon}$ and $-\hat{\epsilon}$ describe the **exact same linear polarization axis** (a polarization axis is a headless double arrow $\leftrightarrow$, not a directed vector $\rightarrow$).
+* Notice that in our formula, the unit vector $\hat{\epsilon}$ only ever appears squared:
+  $$p_\pi = (\hat{\epsilon}\cdot\hat{b})^2 = \cos^2\alpha_\epsilon, \qquad P_2(\cos\alpha_\epsilon) = \frac{3(\hat{\epsilon}\cdot\hat{b})^2 - 1}{2}$$
+  Squaring $\hat{\epsilon}\cdot\hat{b}$ makes the physics completely invariant under $\hat{\epsilon} \to -\hat{\epsilon}$ (and corresponds to the cycle-averaged intensity $\langle E^2\cos^2(\omega t)\rangle = \frac{1}{2}E^2$).
+* When I referred to "opposite signs of $P_2$ for pump and probe", I meant the **algebraic sign of the quadrupole factor $P_2(\cos\alpha) \in [-1/2, +1]$** (which is $+1$ when a beam's polarization axis is parallel to $\vec{B}$, $\alpha = 0^\circ$, and $-1/2$ when a beam's polarization axis is perpendicular to $\vec{B}$, $\alpha = 90^\circ$)—**not** opposite directions of an oscillating $\vec{E}$ vector!
+
+#### B. "Since the beams are counter-propagating, won't the phase between them vary at every point $z$ along the cell?"
+**Yes!** At position $z$ in the cell, the pump has spatial phase $+kz$ and the counter-propagating probe has spatial phase $-kz$. Their relative phase $\Delta\phi(z) = 2kz$ rotates by $360^\circ$ every half-wavelength ($\lambda/2 = 390\text{ nm}$). In $\text{lin}\perp\text{lin}$ ($\hat{\epsilon}_{\text{pump}} = \hat{x}$, $\hat{\epsilon}_{\text{probe}} = \hat{y}$), the total electric field $\vec{E}_{\text{tot}}(z, t)$ forms a spatial polarization grating that cycles through $\text{linear} \to \sigma^+ \to \text{linear} \to \sigma^-$ every $390\text{ nm}$.
+
+**Why doesn't this $390\text{ nm}$ spatial phase grating alter our analysis?** For three independent physical reasons:
+1. **Separate pump and probe roles ($I_{\text{probe}} \ll I_{\text{pump}}$):** The strong pump beam ($\hat{x}$) **alone** optically pumps the ground-state populations $n_g(m_B)$, and the intensity of the single traveling pump wave $I_{\text{pump}}$ is uniform in $z$. The weak probe ($\hat{y}$) simply measures the linear absorption coefficient of the medium already prepared by the pump.
+2. **Thermal washout along $z$:** Even the atoms that form the "zero-velocity" Lamb dip have a longitudinal velocity spread set by the natural linewidth:
+   $$\Delta v_z \sim \frac{\Gamma_0}{k} = \lambda\,\Gamma_0 \approx (780\text{ nm})(6.07\text{ MHz}) \approx 4.7\text{ m/s}$$
+   During the $\tau_{\text{tr}} \approx 6\,\mu\text{s}$ transit time required to build up ground-state alignment, these atoms move longitudinally by:
+   $$\Delta z = \Delta v_z\,\tau_{\text{tr}} \approx (4.7\text{ m/s})(6\,\mu\text{s}) \approx 28\,\mu\text{m} \approx \mathbf{72\text{ optical wavelengths}}$$
+   Flying through $72$ full periods of the $\lambda/2$ grating during a single transit time averages out the relative optical phase $\Delta\phi(z) = 2kz$ for every moving atom.
+3. **Macroscopic spatial integration:** Finally, the photodiode measures the integrated absorption across the entire $5\text{--}10\text{ cm}$ cell ($\sim 2 \times 10^5$ half-wavelengths), averaging over all spatial phases $2kz$.
+

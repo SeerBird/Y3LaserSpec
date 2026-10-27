@@ -11,6 +11,22 @@ def casimir_energy(F, I, J, A, B):
     return 0.5 * A * K + quad
 
 
+def calc_peak_offsets(A, B, I, J, F):
+    """Calculates hyperfine level energies and crossover resonance midpoints in MHz."""
+    F = np.asarray(F, dtype=float)
+    K = F * (F + 1) - I * (I + 1) - J * (J + 1)
+    if I > 0.5 and J > 0.5:
+        denom = 4.0 * I * (2.0 * I - 1.0) * J * (2.0 * J - 1.0)
+        Bterm = B * (1.5 * K * (K + 1) - 2.0 * I * (I + 1) * J * (J + 1)) / denom
+    else:
+        Bterm = 0.0
+    E = 0.5 * A * K + Bterm
+    i, j = np.triu_indices(len(E), k=1)
+    E_co = 0.5 * (E[i] + E[j])
+    return np.concatenate([E, E_co])
+
+
+
 # endregion
 # region predefined quantities
 

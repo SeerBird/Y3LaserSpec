@@ -124,8 +124,8 @@ def plot_polarization_effects(resolution:int):
         fontweight="bold",
     )
     plt.tight_layout()
-    os.makedirs("figures", exist_ok=True)
-    output_path = os.path.join("figures", "polarization_effects_lower_states.png")
+    os.makedirs("../figures", exist_ok=True)
+    output_path = os.path.join("../figures", "polarization_effects_lower_states.png")
     plt.savefig(output_path, dpi=200)
     print(f"Saved discrete polarization comparison plot to '{output_path}'.", flush=True)
     plt.close(fig)
@@ -216,8 +216,8 @@ def plot_qwp_rotation_sweep():
         fontweight="bold",
     )
     plt.tight_layout()
-    os.makedirs("figures", exist_ok=True)
-    output_sweep_path = os.path.join("figures", "polarization_qwp_rotation_map.png")
+    os.makedirs("../figures", exist_ok=True)
+    output_sweep_path = os.path.join("../figures", "polarization_qwp_rotation_map.png")
     plt.savefig(output_sweep_path, dpi=200)
     print(f"Saved continuous QWP sweep plot to '{output_sweep_path}'.", flush=True)
     plt.close(fig)

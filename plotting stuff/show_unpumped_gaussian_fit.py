@@ -4,16 +4,16 @@ Run with: python show_unpumped_gaussian_fit.py
 """
 
 import sys
-sys.path.insert(0, '.')
+sys.path.insert(0, '..')
 import main
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import least_squares
 
 # Load Protocol 1
-fp_file = 'data/Session 9/F1.CSV'
-p_file = 'data/Session 9/P1.CSV'
-u_file = 'data/Session 9/U1.CSV'
+fp_file = '../data/Session 9/F1.CSV'
+p_file = '../data/Session 9/P1.CSV'
+u_file = '../data/Session 9/U1.CSV'
 
 freq, fabry, pumped, unpumped = main.prep_data(fp_file, p_file, u_file, align_shift=False)
 fsr = 374.74 # MHz/fringe

@@ -9,7 +9,7 @@ Run with: python show_saturation_fits.py
 """
 
 import sys
-sys.path.insert(0, '.')
+sys.path.insert(0, '..')
 import main
 import numpy as np
 import matplotlib.pyplot as plt
